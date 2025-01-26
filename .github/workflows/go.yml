@@ -1,0 +1,75 @@
+name: Go Release
+
+on:
+  push:
+    tags:
+      - '*' # 当有新的 tag 被 push 时触发
+  workflow_dispatch: # 允许手动触发
+      
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 允许创建 release
+      actions: write # 允许上传 assets
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23'
+
+    - name: Build
+      run: go build -o http_proxy .
+
+    - name: Generate Release Notes
+      id: generate_release_notes
+      uses: actions/github-script@v6
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        script: |
+          const tag = context.ref.replace('refs/tags/', '');
+          const response = await github.rest.repos.listCommits({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            sha: tag
+          });
+
+          let releaseNotes = `Release notes for tag ${tag}:\n\n`;
+          response.data.forEach(commit => {
+            // Check if author exists and is not null
+            if (commit.author) {
+              releaseNotes += `- ${commit.commit.message} (${commit.author.login})\n`;
+            } else {
+              releaseNotes += `- ${commit.commit.message} (Author information not available)\n`;
+            }
+          });
+
+          return releaseNotes;
+        result-encoding: string
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        release_name: Release ${{ github.ref_name }}
+        body: ${{ steps.generate_release_notes.outputs.result }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./http_proxy  #  可执行文件的路径
+        asset_name: http_proxy #  Release 中显示的文件名
+        asset_content_type: application/octet-stream
