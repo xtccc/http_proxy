@@ -8,36 +8,12 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
-/* // 域名和转发方式的映射
-var domainForwardMap = []struct {
-	DomainPattern string
-	ForwardMethod string
-}{
-	{"*.cn", "direct"},
-	{"douyu.com", "direct"},
-	{"*.douyucdn.cn", "direct"},
-	{"*.bilibili.com", "direct"},
-	{"*.miui.com", "direct"},
-	{"*.zhihu.com", "direct"},
-	{"*.zhimg.com", "direct"},
-	{"*.hdslb.com", "direct"},
-	{"*.biliapi.net", "direct"},
-	{"*.alicdn.com", "direct"},
-	{"*.alipay.com", "direct"},
-	{"*.jd.com", "direct"},
-	{"*.360buyimg.com", "direct"},
-	{"*.feishu.cn", "direct"},
-	{"*.feishucdn.com", "direct"},
-	{"*.mi.com", "direct"},
-	{"111.13.24.98", "direct"},
-	{"*.qq.com", "direct"},
-	{"google.com", "proxy"},
-}
-*/
 // 检查域名是否符合后缀匹配规则
 func getForwardMethodForHost(proxy_upstream, host, port string) (upstreamHost, method string) {
 	// 遍历映射规则
@@ -99,8 +75,6 @@ func readRequestHeader(conn net.Conn) (string, error) {
 }
 
 func handleConnectRequest(conn net.Conn) {
-	defer conn.Close()
-
 	reqLine, err := readRequestHeader(conn)
 	if err != nil {
 		fmt.Println("readRequestHeader error", err)
@@ -206,33 +180,60 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 			fmt.Println("Error forwarding response to client:", err)
 			return
 		}
-
-		// 双向转发数据（开始隧道）
-		go func() {
-			_, err := io.Copy(upstreamConn, conn)
-			if err != nil {
-				fmt.Println("Error copying data to upstream:", err)
-			}
-		}()
-		_, err = io.Copy(conn, upstreamConn)
-		if err != nil {
-			fmt.Println("Error copying data to client:", err)
-		}
+		forward_io_copy(conn, upstreamConn)
 	} else if forward_method == "direct" {
+
 		targetConn, err := net.Dial("tcp", upstreamHost)
 		if err != nil {
 			fmt.Println("Error connecting to target:", err)
 			return
 		}
-		defer targetConn.Close()
+		//time.Sleep(time.Second)
 
 		// 发送 200 OK 响应到客户端，告知隧道建立成功
-		conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+		targetConn.SetWriteDeadline(time.Now().Add(1 * time.Second))
 
-		// 双向转发数据
-		go io.Copy(targetConn, conn)
-		io.Copy(conn, targetConn)
+		_, err = conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+		if err != nil {
+			fmt.Println("Error writing to client:", err)
+			return
+		}
+		targetConn.SetWriteDeadline(time.Time{}) // 清除写入超时
+
+		forward_io_copy(conn, targetConn)
 
 	}
+
+}
+
+func forward_io_copy(conn, targetConn net.Conn) {
+	// 使用 channel 和 WaitGroup 来管理双向转发
+	errCh := make(chan error, 2)
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+
+	// 转发 conn -> targetConn
+	go func() {
+		defer wg.Done()
+		_, err := io.Copy(targetConn, conn)
+		if err != nil {
+			errCh <- fmt.Errorf("Error copying data to upstream: %w", err)
+		}
+	}()
+
+	// 转发 targetConn -> conn
+	go func() {
+		defer wg.Done()
+		_, err := io.Copy(conn, targetConn)
+		if err != nil {
+			errCh <- fmt.Errorf("Error copying data to client: %w", err)
+		}
+	}()
+
+	// 等待转发完成
+	wg.Wait()
+	targetConn.Close()
+	conn.Close()
+	close(errCh)
 
 }

@@ -1,5 +1,7 @@
 # 域名转发规则配置
 rules:
+  - domainPattern: "google.com"
+    forwardMethod: "proxy"
   - domainPattern: "*.cn"
     forwardMethod: "direct"
   - domainPattern: "douyu.com"
@@ -38,5 +40,9 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.edu.cn"
     forwardMethod: "direct"    
-  - domainPattern: "google.com"
-    forwardMethod: "proxy"
+  - domainPattern: "*.tianyancha.com"
+    forwardMethod: "direct"    
+  - domainPattern: "*.taou.com"
+    forwardMethod: "direct"
+  - domainPattern: "*.bilivideo.com"
+    forwardMethod: "direct"        
