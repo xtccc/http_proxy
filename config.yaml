@@ -59,4 +59,4 @@ rules:
   - domainPattern: "*.volces.com"
     forwardMethod: "direct"
   - domainPattern: "*.umeng.com"
-    forwardMethod: "direct"    
+    forwardMethod: "direct"
