@@ -2,6 +2,8 @@
 rules:
   - domainPattern: "google.com"
     forwardMethod: "proxy"
+  - domainPattern: "services.googleapis.cn"
+    forwardMethod: "proxy"
   - domainPattern: "*.cn"
     forwardMethod: "direct"
   - domainPattern: "douyu.com"
@@ -60,3 +62,6 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.umeng.com"
     forwardMethod: "direct"
+  - domainPattern: "*.deepseek.com"
+    forwardMethod: "direct"
+    
