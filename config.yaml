@@ -64,4 +64,6 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.deepseek.com"
     forwardMethod: "direct"
-    
+  - domainPattern: "*.fqnovelpic.com"
+    forwardMethod: "direct"
+
