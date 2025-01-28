@@ -23,3 +23,9 @@ jobs:
 
     - name: Build
       run: go build -o http_proxy .
+
+    - name: Upload binary as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: http_proxy  # 产出物的名称
+        path: http_proxy  # 要上传的文件路径      
