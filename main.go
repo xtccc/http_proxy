@@ -2,12 +2,15 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -15,7 +18,7 @@ import (
 )
 
 // 检查域名是否符合后缀匹配规则
-func getForwardMethodForHost(proxy_upstream, host, port string) (upstreamHost, method string) {
+func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstreamHost, method string) {
 	// 遍历映射规则
 	for _, rule := range domainForwardMap.Rules {
 
@@ -28,7 +31,7 @@ func getForwardMethodForHost(proxy_upstream, host, port string) (upstreamHost, m
 				} else {
 					upstreamHost = proxy_upstream
 				}
-				logrus.Infof("host: %s method: %s upstream: %s", host, rule.ForwardMethod, upstreamHost)
+				logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, rule.ForwardMethod, upstreamHost)
 				return upstreamHost, rule.ForwardMethod
 			}
 		} else if host == rule.DomainPattern {
@@ -38,7 +41,7 @@ func getForwardMethodForHost(proxy_upstream, host, port string) (upstreamHost, m
 				upstreamHost = proxy_upstream
 			}
 			// 精确匹配域名
-			logrus.Infof("host: %s method: %s upstream: %s", host, rule.ForwardMethod, upstreamHost)
+			logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, rule.ForwardMethod, upstreamHost)
 			return upstreamHost, rule.ForwardMethod
 		}
 	}
@@ -46,12 +49,12 @@ func getForwardMethodForHost(proxy_upstream, host, port string) (upstreamHost, m
 	if strings.HasPrefix(host, "192.168.") || strings.HasPrefix(host, "10.") {
 		// 如果 host 是以 192.168. 或 10. 开头的内网 IP，使用直连规则
 		upstreamHost = host + ":" + port
-		logrus.Infof("host: %s method: %s upstream: %s", host, "direct", upstreamHost)
+		logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, "direct", upstreamHost)
 		return upstreamHost, "direct"
 	}
 
 	// 默认使用代理
-	logrus.Infof("host: %s method: %s upstream: %s", host, "proxy", proxy_upstream)
+	logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, "proxy", proxy_upstream)
 	return proxy_upstream, "proxy"
 }
 
@@ -88,25 +91,81 @@ func readRequestHeader(conn net.Conn) (string, error) {
 	return requestBuilder.String(), nil
 }
 
-func createHTTPRequest(reqline string) (*http.Request, error) {
-	// 使用 strings.Reader 将 reqline 包装成 io.Reader
-	reader := strings.NewReader(reqline)
+func readRequestHeaderAndBody(conn net.Conn) (string, []byte, error) {
+	reader := bufio.NewReader(conn)
+	var requestBuilder strings.Builder
+	var contentLength int64 = 0
 
-	// 使用 http.ReadRequest 解析请求
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil && err != io.EOF {
+			return "", nil, fmt.Errorf("error reading client request: %v", err)
+		}
+
+		requestBuilder.WriteString(line)
+
+		if strings.HasPrefix(line, "Content-Length:") {
+			contentLength, _ = strconv.ParseInt(strings.TrimSpace(strings.Split(line, ":")[1]), 10, 64)
+		}
+
+		if err == io.EOF || line == "\r\n" {
+			break
+		}
+	}
+
+	var body []byte
+	if contentLength > 0 {
+		body = make([]byte, contentLength)
+		_, err := io.ReadFull(reader, body)
+		if err != nil {
+			return "", nil, fmt.Errorf("error reading request body: %v", err)
+		}
+	}
+
+	return requestBuilder.String(), body, nil
+}
+
+/*
+	 func createHTTPRequest(reqline string) (*http.Request, error) {
+		// 使用 strings.Reader 将 reqline 包装成 io.Reader
+		reader := strings.NewReader(reqline)
+
+		// 使用 http.ReadRequest 解析请求
+		req, err := http.ReadRequest(bufio.NewReader(reader))
+		if err != nil {
+			return nil, fmt.Errorf("error parsing HTTP request: %v", err)
+		}
+
+		return req, nil
+	}
+*/
+func createHTTPRequest(reqline string, body []byte) (*http.Request, error) {
+	reader := strings.NewReader(reqline)
 	req, err := http.ReadRequest(bufio.NewReader(reader))
 	if err != nil {
 		return nil, fmt.Errorf("error parsing HTTP request: %v", err)
+	}
+
+	if len(body) > 0 {
+		req.Body = io.NopCloser(bytes.NewReader(body))
+		req.ContentLength = int64(len(body))
 	}
 
 	return req, nil
 }
 
 func handleConnectRequest(conn net.Conn) {
-	reqLine, err := readRequestHeader(conn)
+	reqLine, body, err := readRequestHeaderAndBody(conn)
+	if err != nil {
+		log.Printf("Failed to read request: %v", err)
+		return
+	}
+
+	/* reqLine, err := readRequestHeader(conn)
 	if err != nil {
 		fmt.Println("readRequestHeader error", err)
 		return
-	}
+	} */
 
 	// 输出请求行
 	//	fmt.Println("Received request:", reqLine)
@@ -127,17 +186,13 @@ func handleConnectRequest(conn net.Conn) {
 		handleConnectRequest_https(conn, target, reqLine)
 		//除了CONNECT其余的都是http的协议，转给http的上游
 	default:
-		req, err := createHTTPRequest(reqLine)
+		req, err := createHTTPRequest(reqLine, body)
 		if err != nil {
-			fmt.Println("createHTTPRequest error", err)
+			log.Printf("Failed to create HTTP request: %v", err)
 			return
 		}
 		handleConnectRequest_http(conn, req)
 	}
-	/* default:
-		fmt.Println("Unsupported method:", method)
-	} */
-
 }
 
 // 处理CONNECT请求（HTTPS代理）
@@ -151,7 +206,7 @@ func handleConnectRequest_https(conn net.Conn, target, reqLine string) {
 	host := hostPort[0]
 	port := hostPort[1]
 	proxy_upstream := *proxyAddr
-	upstream, ForwardMethod := getForwardMethodForHost(proxy_upstream, host, port)
+	upstream, ForwardMethod := getForwardMethodForHost(proxy_upstream, host, port, "https")
 
 	// 调用 forward 函数进行请求转发
 	forward(upstream, ForwardMethod, reqLine, conn)
@@ -159,7 +214,7 @@ func handleConnectRequest_https(conn net.Conn, target, reqLine string) {
 }
 func handleConnectRequest_http(conn net.Conn, req *http.Request) {
 	proxy_upstream := *proxyAddr
-	upstream, ForwardMethod := getForwardMethodForHost(proxy_upstream, req.Host, req.URL.Port())
+	upstream, ForwardMethod := getForwardMethodForHost(proxy_upstream, req.Host, req.URL.Port(), "http")
 
 	if ForwardMethod == "proxy" {
 		handleConnection_http_proxy(conn, req, upstream)

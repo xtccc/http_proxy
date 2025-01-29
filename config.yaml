@@ -66,4 +66,10 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.fqnovelpic.com"
     forwardMethod: "direct"
-
+  - domainPattern: "*.xiaomi.net"
+    forwardMethod: "direct"
+  - domainPattern: "*.xiaomixiaoai.com"
+    forwardMethod: "direct"
+  - domainPattern: "*.miwifi.com"
+    forwardMethod: "direct"
+    
