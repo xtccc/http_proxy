@@ -125,18 +125,18 @@ func handleConnectRequest(conn net.Conn) {
 	switch method {
 	case "CONNECT":
 		handleConnectRequest_https(conn, target, reqLine)
-	case "GET":
-
+		//除了CONNECT其余的都是http的协议，转给http的上游
+	default:
 		req, err := createHTTPRequest(reqLine)
 		if err != nil {
 			fmt.Println("createHTTPRequest error", err)
 			return
 		}
 		handleConnectRequest_http(conn, req)
-
-	default:
-		fmt.Println("Unsupported method:", method)
 	}
+	/* default:
+		fmt.Println("Unsupported method:", method)
+	} */
 
 }
 
