@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -82,4 +84,37 @@ func handleConnection_http_proxy(clientConn net.Conn, req *http.Request, upstrea
 		log.Printf("Failed to send response to client: %v", err)
 		return
 	}
+}
+
+// 读取 HTTP 请求头直到遇到空行
+func readRequestHeader(conn net.Conn) (string, error) {
+	// 创建一个新的缓冲读取器
+	reader := bufio.NewReader(conn)
+
+	// 用于构建请求数据
+	var requestBuilder strings.Builder
+
+	for {
+		// 逐行读取请求
+		line, err := reader.ReadString('\n')
+		if err != nil && err != io.EOF {
+			return "", fmt.Errorf("error reading client request: %v", err)
+		}
+
+		// 写入到请求构建器中
+		requestBuilder.WriteString(line)
+
+		if err == io.EOF {
+			break
+		}
+
+		// 检测是否到达空行（请求头结束）
+		if line == "\r\n" {
+			break
+		}
+
+	}
+
+	// 返回读取到的完整请求头
+	return requestBuilder.String(), nil
 }

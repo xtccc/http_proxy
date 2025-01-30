@@ -10,9 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/sirupsen/logrus"
 )
@@ -58,87 +56,6 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 	return proxy_upstream, "proxy"
 }
 
-// 读取 HTTP 请求头直到遇到空行
-func readRequestHeader(conn net.Conn) (string, error) {
-	// 创建一个新的缓冲读取器
-	reader := bufio.NewReader(conn)
-
-	// 用于构建请求数据
-	var requestBuilder strings.Builder
-
-	for {
-		// 逐行读取请求
-		line, err := reader.ReadString('\n')
-		if err != nil && err != io.EOF {
-			return "", fmt.Errorf("error reading client request: %v", err)
-		}
-
-		// 写入到请求构建器中
-		requestBuilder.WriteString(line)
-
-		if err == io.EOF {
-			break
-		}
-
-		// 检测是否到达空行（请求头结束）
-		if line == "\r\n" {
-			break
-		}
-
-	}
-
-	// 返回读取到的完整请求头
-	return requestBuilder.String(), nil
-}
-
-func readRequestHeaderAndBody(conn net.Conn) (string, []byte, error) {
-	reader := bufio.NewReader(conn)
-	var requestBuilder strings.Builder
-	var contentLength int64 = 0
-
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil && err != io.EOF {
-			return "", nil, fmt.Errorf("error reading client request: %v", err)
-		}
-
-		requestBuilder.WriteString(line)
-
-		if strings.HasPrefix(line, "Content-Length:") {
-			contentLength, _ = strconv.ParseInt(strings.TrimSpace(strings.Split(line, ":")[1]), 10, 64)
-		}
-
-		if err == io.EOF || line == "\r\n" {
-			break
-		}
-	}
-
-	var body []byte
-	if contentLength > 0 {
-		body = make([]byte, contentLength)
-		_, err := io.ReadFull(reader, body)
-		if err != nil {
-			return "", nil, fmt.Errorf("error reading request body: %v", err)
-		}
-	}
-
-	return requestBuilder.String(), body, nil
-}
-
-/*
-	 func createHTTPRequest(reqline string) (*http.Request, error) {
-		// 使用 strings.Reader 将 reqline 包装成 io.Reader
-		reader := strings.NewReader(reqline)
-
-		// 使用 http.ReadRequest 解析请求
-		req, err := http.ReadRequest(bufio.NewReader(reader))
-		if err != nil {
-			return nil, fmt.Errorf("error parsing HTTP request: %v", err)
-		}
-
-		return req, nil
-	}
-*/
 func createHTTPRequest(reqline string, body []byte) (*http.Request, error) {
 	reader := strings.NewReader(reqline)
 	req, err := http.ReadRequest(bufio.NewReader(reader))
@@ -161,15 +78,6 @@ func handleConnectRequest(conn net.Conn) {
 		return
 	}
 
-	/* reqLine, err := readRequestHeader(conn)
-	if err != nil {
-		fmt.Println("readRequestHeader error", err)
-		return
-	} */
-
-	// 输出请求行
-	//	fmt.Println("Received request:", reqLine)
-
 	// 解析出目标主机和端口
 	// 格式为 CONNECT www.google.com:443 HTTP/1.1
 	parts := strings.Split(reqLine, " ")
@@ -177,6 +85,7 @@ func handleConnectRequest(conn net.Conn) {
 		fmt.Println("Invalid CONNECT request format")
 		return
 	}
+	fmt.Println("请求头parts:", parts)
 
 	method := parts[0]
 	target := parts[1]
@@ -195,23 +104,6 @@ func handleConnectRequest(conn net.Conn) {
 	}
 }
 
-// 处理CONNECT请求（HTTPS代理）
-func handleConnectRequest_https(conn net.Conn, target, reqLine string) {
-	hostPort := strings.Split(target, ":")
-	if len(hostPort) != 2 {
-		fmt.Println("Invalid target format")
-		return
-	}
-
-	host := hostPort[0]
-	port := hostPort[1]
-	proxy_upstream := *proxyAddr
-	upstream, ForwardMethod := getForwardMethodForHost(proxy_upstream, host, port, "https")
-
-	// 调用 forward 函数进行请求转发
-	forward(upstream, ForwardMethod, reqLine, conn)
-
-}
 func handleConnectRequest_http(conn net.Conn, req *http.Request) {
 	proxy_upstream := *proxyAddr
 	upstream, ForwardMethod := getForwardMethodForHost(proxy_upstream, req.Host, req.URL.Port(), "http")
@@ -269,89 +161,4 @@ func main() {
 		// 处理 CONNECT 请求
 		go handleConnectRequest(conn)
 	}
-}
-
-func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
-
-	if forward_method == "proxy" {
-		// 尝试连接到目标服务器
-		upstreamConn, err := net.Dial("tcp", upstreamHost)
-		if err != nil {
-			fmt.Println("Error connecting to target:", err)
-			return
-		}
-		defer upstreamConn.Close()
-
-		// 将客户端的 CONNECT 请求转发给上游代理
-		_, err = upstreamConn.Write([]byte(reqLine))
-		if err != nil {
-			fmt.Println("Error forwarding CONNECT to upstream:", err)
-			return
-		}
-
-		// 读取上游代理的响应
-		upstream_resp, err := readRequestHeader(upstreamConn)
-		if err != nil {
-			fmt.Println("readRequestHeader(upstreamConn) error ", err)
-			return
-		}
-
-		// 转发上游代理的响应给客户端
-		_, err = conn.Write([]byte(upstream_resp))
-		if err != nil {
-			fmt.Println("Error forwarding response to client:", err)
-			return
-		}
-		forward_io_copy(conn, upstreamConn)
-	} else if forward_method == "direct" {
-
-		targetConn, err := net.Dial("tcp", upstreamHost)
-		if err != nil {
-			fmt.Println("Error connecting to target:", err)
-			return
-		}
-		_, err = conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
-		if err != nil {
-			fmt.Println("Error writing to client:", err)
-			return
-		}
-
-		//targetConn.SetWriteDeadline(time.Time{}) // 清除写入超时
-
-		forward_io_copy(conn, targetConn)
-
-	}
-
-}
-
-func forward_io_copy(conn, targetConn net.Conn) {
-	// 使用 channel 和 WaitGroup 来管理双向转发
-	errCh := make(chan error, 2)
-	wg := &sync.WaitGroup{}
-	wg.Add(2)
-
-	// 转发 conn -> targetConn
-	go func() {
-		defer wg.Done()
-		_, err := io.Copy(targetConn, conn)
-		if err != nil {
-			errCh <- fmt.Errorf("error copying data to upstream: %w", err)
-		}
-	}()
-
-	// 转发 targetConn -> conn
-	go func() {
-		defer wg.Done()
-		_, err := io.Copy(conn, targetConn)
-		if err != nil {
-			errCh <- fmt.Errorf("error copying data to client: %w", err)
-		}
-	}()
-
-	// 等待转发完成
-	wg.Wait()
-	targetConn.Close()
-	conn.Close()
-	close(errCh)
-
 }
