@@ -85,7 +85,6 @@ func handleConnectRequest(conn net.Conn) {
 		fmt.Println("Invalid CONNECT request format")
 		return
 	}
-	fmt.Println("请求头parts:", parts)
 
 	method := parts[0]
 	target := parts[1]
