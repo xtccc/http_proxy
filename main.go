@@ -142,18 +142,22 @@ func main() {
 	listener, err := net.Listen("tcp", *listenAddr)
 	if err != nil {
 		logrus.Errorln("Error starting server:", err)
+		fmt.Println("Error starting server:", err)
 		return
 	}
 
 	defer listener.Close()
 
-	logrus.Errorf("Proxy server is running on %s\n", *listenAddr)
+	hello := fmt.Sprintf("Proxy server is running on %s\n", *listenAddr)
+	logrus.Errorln(hello)
+	fmt.Println(hello)
 
 	// 接受连接
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			logrus.Errorln("Error accepting connection:", err)
+			fmt.Println("Error accepting connection:", err)
 			continue
 		}
 
