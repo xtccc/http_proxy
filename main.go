@@ -82,7 +82,7 @@ func handleConnectRequest(conn net.Conn) {
 	// 格式为 CONNECT www.google.com:443 HTTP/1.1
 	parts := strings.Split(reqLine, " ")
 	if len(parts) < 3 {
-		fmt.Println("Invalid CONNECT request format")
+		logrus.Errorln("Invalid CONNECT request format")
 		return
 	}
 
@@ -141,19 +141,19 @@ func main() {
 	// 启动代理服务，监听指定地址
 	listener, err := net.Listen("tcp", *listenAddr)
 	if err != nil {
-		fmt.Println("Error starting server:", err)
+		logrus.Errorln("Error starting server:", err)
 		return
 	}
 
 	defer listener.Close()
 
-	fmt.Printf("Proxy server is running on %s\n", *listenAddr)
+	logrus.Errorf("Proxy server is running on %s\n", *listenAddr)
 
 	// 接受连接
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Println("Error accepting connection:", err)
+			logrus.Errorln("Error accepting connection:", err)
 			continue
 		}
 

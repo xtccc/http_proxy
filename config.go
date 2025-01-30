@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/sirupsen/logrus"
@@ -23,13 +22,13 @@ var DomainForwardMap []struct {
 func LoadConfig() Config {
 	data, err := os.ReadFile("config.yaml")
 	if err != nil {
-		fmt.Printf("failed to read config file: %v", err)
+		logrus.Errorf("failed to read config file: %v", err)
 		return Config{}
 	}
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		fmt.Printf("failed to parse config: %v", err)
+		logrus.Errorf("failed to parse config: %v", err)
 		return Config{}
 	}
 	n := len(cfg.Rules)

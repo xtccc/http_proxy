@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 )
 
 func readRequestHeaderAndBody(conn net.Conn) (string, []byte, error) {
@@ -48,7 +50,7 @@ func readRequestHeaderAndBody(conn net.Conn) (string, []byte, error) {
 func handleConnectRequest_https(conn net.Conn, target, reqLine string) {
 	hostPort := strings.Split(target, ":")
 	if len(hostPort) != 2 {
-		fmt.Println("Invalid target format")
+		logrus.Errorln("Invalid target format")
 		return
 	}
 
@@ -68,7 +70,7 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 		// 尝试连接到目标服务器
 		upstreamConn, err := net.Dial("tcp", upstreamHost)
 		if err != nil {
-			fmt.Println("Error connecting to target:", err)
+			logrus.Errorln("Error connecting to target:", err)
 			return
 		}
 		defer upstreamConn.Close()
@@ -76,21 +78,21 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 		// 将客户端的 CONNECT 请求转发给上游代理
 		_, err = upstreamConn.Write([]byte(reqLine))
 		if err != nil {
-			fmt.Println("Error forwarding CONNECT to upstream:", err)
+			logrus.Errorln("Error forwarding CONNECT to upstream:", err)
 			return
 		}
 
 		// 读取上游代理的响应
 		upstream_resp, err := readRequestHeader(upstreamConn)
 		if err != nil {
-			fmt.Println("readRequestHeader(upstreamConn) error ", err)
+			logrus.Errorln("readRequestHeader(upstreamConn) error ", err)
 			return
 		}
 
 		// 转发上游代理的响应给客户端
 		_, err = conn.Write([]byte(upstream_resp))
 		if err != nil {
-			fmt.Println("Error forwarding response to client:", err)
+			logrus.Errorln("Error forwarding response to client:", err)
 			return
 		}
 		forward_io_copy(conn, upstreamConn)
@@ -98,12 +100,12 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 
 		targetConn, err := net.Dial("tcp", upstreamHost)
 		if err != nil {
-			fmt.Println("Error connecting to target:", err)
+			logrus.Errorln("Error connecting to target:", err)
 			return
 		}
 		_, err = conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 		if err != nil {
-			fmt.Println("Error writing to client:", err)
+			logrus.Errorln("Error writing to client:", err)
 			return
 		}
 
