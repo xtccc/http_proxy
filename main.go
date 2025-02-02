@@ -17,6 +17,7 @@ import (
 
 // 检查域名是否符合后缀匹配规则
 func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstreamHost, method string) {
+	direct_upstream := host + ":" + port
 	// 遍历映射规则
 	for _, rule := range domainForwardMap.Rules {
 
@@ -25,7 +26,7 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 			// 检查域名后缀是否匹配
 			if strings.HasSuffix(host, rule.DomainPattern[1:]) {
 				if rule.ForwardMethod == "direct" {
-					upstreamHost = host + ":" + port
+					upstreamHost = direct_upstream
 				} else {
 					upstreamHost = proxy_upstream
 				}
@@ -34,7 +35,7 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 			}
 		} else if host == rule.DomainPattern {
 			if rule.ForwardMethod == "direct" {
-				upstreamHost = host + ":" + port
+				upstreamHost = direct_upstream
 			} else {
 				upstreamHost = proxy_upstream
 			}
@@ -46,9 +47,26 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 
 	if strings.HasPrefix(host, "192.168.") || strings.HasPrefix(host, "10.") {
 		// 如果 host 是以 192.168. 或 10. 开头的内网 IP，使用直连规则
-		upstreamHost = host + ":" + port
+		upstreamHost = direct_upstream
 		logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, "direct", upstreamHost)
 		return upstreamHost, "direct"
+	}
+
+	// 所有的ip地址当作域名的域名，匹配为direct
+	// 除了1.1.1.1和8.8.8.8是proxy模式
+	// 新增IP地址判断逻辑
+	if ip := net.ParseIP(host); ip != nil {
+		if host == "1.1.1.1" || host == "8.8.8.8" {
+			upstreamHost = proxy_upstream
+			method = "proxy"
+			logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, method, upstreamHost)
+			return
+		} else {
+			upstreamHost = direct_upstream
+			method = "direct"
+			logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, method, upstreamHost)
+			return
+		}
 	}
 
 	// 默认使用代理
@@ -105,7 +123,14 @@ func handleConnectRequest(conn net.Conn) {
 
 func handleConnectRequest_http(conn net.Conn, req *http.Request) {
 	proxy_upstream := *proxyAddr
-	upstream, ForwardMethod := getForwardMethodForHost(proxy_upstream, req.Host, req.URL.Port(), "http")
+	var host string
+	if strings.Contains(req.Host, ":") {
+		host = strings.Split(req.Host, ":")[0]
+	} else {
+		host = req.Host
+	}
+
+	upstream, ForwardMethod := getForwardMethodForHost(proxy_upstream, host, req.URL.Port(), "http")
 
 	if ForwardMethod == "proxy" {
 		handleConnection_http_proxy(conn, req, upstream)
