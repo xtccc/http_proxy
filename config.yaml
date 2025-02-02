@@ -72,4 +72,9 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.miwifi.com"
     forwardMethod: "direct"
-    
+  - domainPattern: "*.meituan.com"
+    forwardMethod: "direct"
+  - domainPattern: "*.meituan.net"
+    forwardMethod: "direct"
+  - domainPattern: "*.mijia.tech"
+    forwardMethod: "direct"    
