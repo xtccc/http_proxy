@@ -82,3 +82,6 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.baidu.com"
     forwardMethod: "direct"
+  - domainPattern: "*.cainiao.com"
+    forwardMethod: "direct"
+    
