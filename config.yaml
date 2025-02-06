@@ -86,3 +86,11 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.gitee.com"
     forwardMethod: "direct"
+  - domainPattern: "*.aliyuncs.com"
+    forwardMethod: "direct"    
+  - domainPattern: "*.qcloud.com"
+    forwardMethod: "direct"        
+  - domainPattern: "*.dianping.com"
+    forwardMethod: "direct"        
+    
+    
