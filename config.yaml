@@ -92,5 +92,7 @@ rules:
     forwardMethod: "direct"        
   - domainPattern: "*.dianping.com"
     forwardMethod: "direct"        
-    
+  - domainPattern: "*.smallparking.eu.org"
+    forwardMethod: "direct"        
+     
     
