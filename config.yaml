@@ -84,4 +84,5 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.cainiao.com"
     forwardMethod: "direct"
-    
+  - domainPattern: "*.gitee.com"
+    forwardMethod: "direct"
