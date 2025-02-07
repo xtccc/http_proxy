@@ -96,5 +96,7 @@ rules:
     forwardMethod: "direct"        
   - domainPattern: "j1900"
     forwardMethod: "direct"        
-     
+  - domainPattern: "*.smzdm.com"
+    forwardMethod: "direct"        
+    
     
