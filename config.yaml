@@ -100,5 +100,7 @@ rules:
     forwardMethod: "direct"        
   - domainPattern: "*.myqcloud.com"
     forwardMethod: "direct"        
-    
+  - domainPattern: "*.weixinbridge.com"
+    forwardMethod: "direct"        
+     
     
