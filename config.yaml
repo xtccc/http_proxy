@@ -98,7 +98,7 @@ rules:
     forwardMethod: "direct"        
   - domainPattern: "*.smzdm.com"
     forwardMethod: "direct"        
-   - domainPattern: "*.myqcloud.com"
+  - domainPattern: "*.myqcloud.com"
     forwardMethod: "direct"        
     
     
