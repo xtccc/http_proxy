@@ -102,5 +102,5 @@ rules:
     forwardMethod: "direct"        
   - domainPattern: "*.weixinbridge.com"
     forwardMethod: "direct"        
-     
-    
+  - domainPattern: "*.amap.com"
+    forwardMethod: "direct"
