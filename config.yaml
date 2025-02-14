@@ -116,3 +116,9 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.alipayobjects.com"
     forwardMethod: "direct"
+  - domainPattern: "*.qichacha.com"
+    forwardMethod: "direct"    
+  - domainPattern: "*.qcc.com"
+    forwardMethod: "direct"        
+    
+    
