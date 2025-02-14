@@ -119,6 +119,10 @@ rules:
   - domainPattern: "*.qichacha.com"
     forwardMethod: "direct"    
   - domainPattern: "*.qcc.com"
-    forwardMethod: "direct"        
+    forwardMethod: "direct"
+  - domainPattern: "*.biligame.com"
+    forwardMethod: "direct"   
+    
+
     
     
