@@ -60,11 +60,11 @@ func handleConnectRequest_https(conn net.Conn, target, reqLine string) {
 	upstream, ForwardMethod := getForwardMethodForHost(proxy_upstream, host, port, "https")
 
 	// 调用 forward 函数进行请求转发
-	forward(upstream, ForwardMethod, reqLine, conn)
+	forward(upstream, ForwardMethod, reqLine, conn, host)
 
 }
 
-func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
+func forward(upstreamHost, forward_method, reqLine string, conn net.Conn, host string) {
 
 	if forward_method == "proxy" {
 		// 尝试连接到目标服务器
@@ -95,7 +95,7 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 			logrus.Errorln("Error forwarding response to client:", err)
 			return
 		}
-		forward_io_copy(conn, upstreamConn, upstreamHost)
+		forward_io_copy(conn, upstreamConn, upstreamHost, forward_method, host)
 	} else if forward_method == "direct" {
 
 		targetConn, err := net.Dial("tcp", upstreamHost)
@@ -111,13 +111,13 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 
 		//targetConn.SetWriteDeadline(time.Time{}) // 清除写入超时
 
-		forward_io_copy(conn, targetConn, upstreamHost)
+		forward_io_copy(conn, targetConn, upstreamHost, forward_method, host)
 
 	}
 
 }
 
-func forward_io_copy(conn, targetConn net.Conn, upstreamHost string) {
+func forward_io_copy(conn, targetConn net.Conn, upstreamHost, forward_method, host string) {
 	// 使用 channel 和 WaitGroup 来管理双向转发
 	errCh := make(chan error, 2)
 	wg := &sync.WaitGroup{}
@@ -130,7 +130,7 @@ func forward_io_copy(conn, targetConn net.Conn, upstreamHost string) {
 		if err != nil {
 			errCh <- fmt.Errorf("error copying data to upstream: %w", err)
 		}
-		forwardedBytes.WithLabelValues("tcp", upstreamHost, "proxy").Add(float64(written))
+		forwardedBytes.WithLabelValues("https", host, forward_method).Add(float64(written))
 	}()
 
 	// 转发 targetConn -> conn
@@ -140,7 +140,7 @@ func forward_io_copy(conn, targetConn net.Conn, upstreamHost string) {
 		if err != nil {
 			errCh <- fmt.Errorf("error copying data to client: %w", err)
 		}
-		forwardedBytes.WithLabelValues("tcp", upstreamHost, "proxy").Add(float64(written))
+		forwardedBytes.WithLabelValues("https", host, forward_method).Add(float64(written))
 	}()
 
 	// 等待转发完成
