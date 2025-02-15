@@ -2,14 +2,62 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
+func createHTTPRequest(reqline string, body []byte) (*http.Request, error) {
+	reader := strings.NewReader(reqline)
+	req, err := http.ReadRequest(bufio.NewReader(reader))
+	if err != nil {
+		return nil, fmt.Errorf("error parsing HTTP request: %v", err)
+	}
+
+	if len(body) > 0 {
+		req.Body = io.NopCloser(bytes.NewReader(body))
+		req.ContentLength = int64(len(body))
+	}
+
+	return req, nil
+}
+
+func handleConnectRequest_http(conn net.Conn, req *http.Request) {
+	proxy_upstream := *proxyAddr
+	var host string
+	if strings.Contains(req.Host, ":") {
+		host = strings.Split(req.Host, ":")[0]
+	} else {
+		host = req.Host
+	}
+
+	upstream, ForwardMethod := getForwardMethodForHost(proxy_upstream, host, req.URL.Port(), "http")
+
+	if ForwardMethod == "proxy" {
+		handleConnection_http_proxy(conn, req, upstream)
+	} else if ForwardMethod == "direct" {
+		handleConnection_http(conn, req)
+
+	} else {
+		logrus.Error("ForwardMethod is wrong", ForwardMethod)
+		return
+	}
+
+}
+
+// 添加辅助函数来记录传输的字节数
+func recordTransferredBytes(protocol, host, method string, bytes int64) {
+	forwardedBytes.WithLabelValues(protocol, host, method).Add(float64(bytes))
+}
+
+// 修改 handleConnection_http 函数
 func handleConnection_http(clientConn net.Conn, req *http.Request) {
 	defer clientConn.Close()
 	var addr string
@@ -26,10 +74,18 @@ func handleConnection_http(clientConn net.Conn, req *http.Request) {
 	defer targetConn.Close()
 
 	// 将客户端的请求转发到目标服务器
-	if err := req.Write(targetConn); err != nil {
+	reqBytes, err := httputil.DumpRequest(req, true)
+	if err != nil {
+		log.Printf("Failed to dump request: %v", err)
+		return
+	}
+	written, err := targetConn.Write(reqBytes)
+	if err != nil {
 		log.Printf("Failed to forward request: %v", err)
 		return
 	}
+	// 记录请求的字节数
+	recordTransferredBytes("http", req.Host, "direct", int64(written))
 
 	// 读取目标服务器的响应
 	resp, err := http.ReadResponse(bufio.NewReader(targetConn), req)
@@ -39,17 +95,25 @@ func handleConnection_http(clientConn net.Conn, req *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	// 将目标服务器的响应返回给客户端
-	if err := resp.Write(clientConn); err != nil {
+	// 将响应写入到缓冲区以计算大小
+	respBytes, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		log.Printf("Failed to dump response: %v", err)
+		return
+	}
+	written, err = clientConn.Write(respBytes)
+	if err != nil {
 		log.Printf("Failed to send response to client: %v", err)
 		return
 	}
+	// 记录响应的字节数
+	recordTransferredBytes("http", req.Host, "direct", int64(written))
 }
 
+// 修改 handleConnection_http_proxy 函数
 func handleConnection_http_proxy(clientConn net.Conn, req *http.Request, upstream string) {
 	defer clientConn.Close()
 
-	// Connect to the upstream HTTP proxy
 	upstreamConn, err := net.Dial("tcp", upstream)
 	if err != nil {
 		log.Printf("Failed to connect to upstream proxy: %v", err)
@@ -57,21 +121,24 @@ func handleConnection_http_proxy(clientConn net.Conn, req *http.Request, upstrea
 	}
 	defer upstreamConn.Close()
 
-	// Modify the request to be suitable for the upstream proxy
-	// Include the full URL (scheme + host + path)
 	req.URL.Scheme = "http"
 	req.URL.Host = req.Host
-	/* req.Header.Set("Host", req.Host)
-	req.RequestURI = ""
-	req.Header.Del("Proxy-Connection") */
 
-	// Forward the client's request to the upstream proxy
-	if err := req.WriteProxy(upstreamConn); err != nil {
+	// 将请求转发到上游代理
+	reqBytes, err := httputil.DumpRequestOut(req, true)
+	if err != nil {
+		log.Printf("Failed to dump request: %v", err)
+		return
+	}
+	written, err := upstreamConn.Write(reqBytes)
+	if err != nil {
 		log.Printf("Failed to forward request to upstream: %v", err)
 		return
 	}
+	// 记录请求的字节数
+	recordTransferredBytes("http", req.Host, "proxy", int64(written))
 
-	// Read the response from the upstream proxy
+	// 读取上游代理的响应
 	resp, err := http.ReadResponse(bufio.NewReader(upstreamConn), req)
 	if err != nil {
 		log.Printf("Failed to read response from upstream: %v", err)
@@ -79,11 +146,19 @@ func handleConnection_http_proxy(clientConn net.Conn, req *http.Request, upstrea
 	}
 	defer resp.Body.Close()
 
-	// Forward the response back to the client
-	if err := resp.Write(clientConn); err != nil {
+	// 将响应写入到缓冲区以计算大小
+	respBytes, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		log.Printf("Failed to dump response: %v", err)
+		return
+	}
+	written, err = clientConn.Write(respBytes)
+	if err != nil {
 		log.Printf("Failed to send response to client: %v", err)
 		return
 	}
+	// 记录响应的字节数
+	recordTransferredBytes("http", req.Host, "proxy", int64(written))
 }
 
 // 读取 HTTP 请求头直到遇到空行

@@ -1,19 +1,43 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"strings"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
+
+// 添加 Prometheus 指标
+var (
+	forwardedRequests = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "proxy_forwarded_requests_total",
+			Help: "转发请求的总数，按协议、主机和转发方式统计",
+		},
+		[]string{"protocol", "host", "method"},
+	)
+
+	forwardedBytes = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "proxy_forwarded_bytes_total",
+			Help: "转发流量的总字节数，按协议、主机和转发方式统计",
+		},
+		[]string{"protocol", "host", "method"},
+	)
+)
+
+func init() {
+	// 注册 Prometheus 指标
+	prometheus.MustRegister(forwardedRequests)
+	prometheus.MustRegister(forwardedBytes)
+}
 
 // 检查域名是否符合后缀匹配规则
 func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstreamHost, method string) {
@@ -31,6 +55,8 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 					upstreamHost = proxy_upstream
 				}
 				logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, rule.ForwardMethod, upstreamHost)
+				// 记录请求计数
+				forwardedRequests.WithLabelValues(protocol, host, rule.ForwardMethod).Inc()
 				return upstreamHost, rule.ForwardMethod
 			}
 		} else if host == rule.DomainPattern {
@@ -41,6 +67,8 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 			}
 			// 精确匹配域名
 			logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, rule.ForwardMethod, upstreamHost)
+			// 记录请求计数
+			forwardedRequests.WithLabelValues(protocol, host, rule.ForwardMethod).Inc()
 			return upstreamHost, rule.ForwardMethod
 		}
 	}
@@ -49,6 +77,8 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 		// 如果 host 是以 192.168. 或 10. 开头的内网 IP，使用直连规则
 		upstreamHost = direct_upstream
 		logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, "direct", upstreamHost)
+		// 记录请求计数
+		forwardedRequests.WithLabelValues(protocol, host, "direct").Inc()
 		return upstreamHost, "direct"
 	}
 
@@ -60,33 +90,24 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 			upstreamHost = proxy_upstream
 			method = "proxy"
 			logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, method, upstreamHost)
+			// 记录请求计数
+			forwardedRequests.WithLabelValues(protocol, host, method).Inc()
 			return
 		} else {
 			upstreamHost = direct_upstream
 			method = "direct"
 			logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, method, upstreamHost)
+			// 记录请求计数
+			forwardedRequests.WithLabelValues(protocol, host, method).Inc()
 			return
 		}
 	}
 
 	// 默认使用代理
 	logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, "proxy", proxy_upstream)
+	// 记录请求计数
+	forwardedRequests.WithLabelValues(protocol, host, "proxy").Inc()
 	return proxy_upstream, "proxy"
-}
-
-func createHTTPRequest(reqline string, body []byte) (*http.Request, error) {
-	reader := strings.NewReader(reqline)
-	req, err := http.ReadRequest(bufio.NewReader(reader))
-	if err != nil {
-		return nil, fmt.Errorf("error parsing HTTP request: %v", err)
-	}
-
-	if len(body) > 0 {
-		req.Body = io.NopCloser(bytes.NewReader(body))
-		req.ContentLength = int64(len(body))
-	}
-
-	return req, nil
 }
 
 func handleConnectRequest(conn net.Conn) {
@@ -119,29 +140,6 @@ func handleConnectRequest(conn net.Conn) {
 		}
 		handleConnectRequest_http(conn, req)
 	}
-}
-
-func handleConnectRequest_http(conn net.Conn, req *http.Request) {
-	proxy_upstream := *proxyAddr
-	var host string
-	if strings.Contains(req.Host, ":") {
-		host = strings.Split(req.Host, ":")[0]
-	} else {
-		host = req.Host
-	}
-
-	upstream, ForwardMethod := getForwardMethodForHost(proxy_upstream, host, req.URL.Port(), "http")
-
-	if ForwardMethod == "proxy" {
-		handleConnection_http_proxy(conn, req, upstream)
-	} else if ForwardMethod == "direct" {
-		handleConnection_http(conn, req)
-
-	} else {
-		logrus.Error("ForwardMethod is wrong", ForwardMethod)
-		return
-	}
-
 }
 
 var domainForwardMap Config
@@ -177,6 +175,18 @@ func main() {
 	logrus.Errorln(hello)
 	fmt.Println(hello)
 
+	// 添加 Prometheus 指标采集的 HTTP 端口
+	metricsAddr := flag.String("metrics", ":9090", "Prometheus metrics 监听地址")
+
+	// 启动 Prometheus 指标服务
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		if err := http.ListenAndServe(*metricsAddr, nil); err != nil {
+			logrus.Errorln("Error starting metrics server:", err)
+			fmt.Println("Error starting metrics server:", err)
+		}
+	}()
+
 	// 接受连接
 	for {
 		conn, err := listener.Accept()
@@ -186,7 +196,7 @@ func main() {
 			continue
 		}
 
-		// 处理 CONNECT 请求
+		// 处理 请求
 		go handleConnectRequest(conn)
 	}
 }

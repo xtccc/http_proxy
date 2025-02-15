@@ -95,7 +95,7 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 			logrus.Errorln("Error forwarding response to client:", err)
 			return
 		}
-		forward_io_copy(conn, upstreamConn)
+		forward_io_copy(conn, upstreamConn, upstreamHost)
 	} else if forward_method == "direct" {
 
 		targetConn, err := net.Dial("tcp", upstreamHost)
@@ -111,13 +111,13 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 
 		//targetConn.SetWriteDeadline(time.Time{}) // 清除写入超时
 
-		forward_io_copy(conn, targetConn)
+		forward_io_copy(conn, targetConn, upstreamHost)
 
 	}
 
 }
 
-func forward_io_copy(conn, targetConn net.Conn) {
+func forward_io_copy(conn, targetConn net.Conn, upstreamHost string) {
 	// 使用 channel 和 WaitGroup 来管理双向转发
 	errCh := make(chan error, 2)
 	wg := &sync.WaitGroup{}
@@ -126,19 +126,21 @@ func forward_io_copy(conn, targetConn net.Conn) {
 	// 转发 conn -> targetConn
 	go func() {
 		defer wg.Done()
-		_, err := io.Copy(targetConn, conn)
+		written, err := io.Copy(targetConn, conn)
 		if err != nil {
 			errCh <- fmt.Errorf("error copying data to upstream: %w", err)
 		}
+		forwardedBytes.WithLabelValues("tcp", upstreamHost, "proxy").Add(float64(written))
 	}()
 
 	// 转发 targetConn -> conn
 	go func() {
 		defer wg.Done()
-		_, err := io.Copy(conn, targetConn)
+		written, err := io.Copy(conn, targetConn)
 		if err != nil {
 			errCh <- fmt.Errorf("error copying data to client: %w", err)
 		}
+		forwardedBytes.WithLabelValues("tcp", upstreamHost, "proxy").Add(float64(written))
 	}()
 
 	// 等待转发完成
