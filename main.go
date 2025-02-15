@@ -149,6 +149,8 @@ func main() {
 	// 解析命令行参数
 	listenAddr := flag.String("listen", ":8080", "监听地址，格式为[host]:port")
 	proxyAddr = flag.String("proxy", "127.0.0.1:8079", "监听地址，格式为[host]:port")
+	// 添加 Prometheus 指标采集的 HTTP 端口
+	metricsAddr := flag.String("metrics", ":9090", "Prometheus metrics 监听地址")
 	flag.Parse()
 
 	// 创建一个日志文件
@@ -174,9 +176,6 @@ func main() {
 	hello := fmt.Sprintf("Proxy server is running on %s\n", *listenAddr)
 	logrus.Errorln(hello)
 	fmt.Println(hello)
-
-	// 添加 Prometheus 指标采集的 HTTP 端口
-	metricsAddr := flag.String("metrics", ":9090", "Prometheus metrics 监听地址")
 
 	// 启动 Prometheus 指标服务
 	go func() {
