@@ -122,7 +122,7 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.biligame.com"
     forwardMethod: "direct"   
-    
-
-    
-    
+  - domainPattern: "*.xyzcdn.net"
+    forwardMethod: "direct"   
+  - domainPattern: "*.xiaoyuzhoufm.com"
+    forwardMethod: "direct"
