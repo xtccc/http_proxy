@@ -126,3 +126,7 @@ rules:
     forwardMethod: "direct"   
   - domainPattern: "*.xiaoyuzhoufm.com"
     forwardMethod: "direct"
+  - domainPattern: "*.yuewen.com"
+    forwardMethod: "direct"
+    
+    
