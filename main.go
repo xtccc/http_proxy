@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
@@ -39,6 +40,21 @@ func init() {
 	prometheus.MustRegister(forwardedBytes)
 }
 
+// 判断一个IP地址是否在指定的范围内
+func isInRange(ipStr, startStr, endStr string) bool {
+	ip := net.ParseIP(ipStr)
+	start := net.ParseIP(startStr)
+	end := net.ParseIP(endStr)
+
+	// 确保有效的IP地址
+	if ip == nil || start == nil || end == nil {
+		return false
+	}
+
+	// 比较IP地址大小
+	return bytes.Compare(ip, start) >= 0 && bytes.Compare(ip, end) <= 0
+}
+
 // 检查域名是否符合后缀匹配规则
 func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstreamHost, method string) {
 	direct_upstream := host + ":" + port
@@ -73,7 +89,8 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 		}
 	}
 
-	if strings.HasPrefix(host, "192.168.") || strings.HasPrefix(host, "10.") {
+	if strings.HasPrefix(host, "192.168.") || strings.HasPrefix(host, "10.") || (strings.HasPrefix(host, "172.") && isInRange(host, "172.16.0.0", "172.31.255.255")) {
+		// 172.16.0.0 - 172.31.255.255 直连
 		// 如果 host 是以 192.168. 或 10. 开头的内网 IP，使用直连规则
 		upstreamHost = direct_upstream
 		logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, "direct", upstreamHost)
