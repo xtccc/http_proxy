@@ -63,8 +63,9 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 
 		// 如果是通配符匹配（例如 *.douyu.cn）
 		if strings.HasPrefix(rule.DomainPattern, "*.") {
-			// 检查域名后缀是否匹配
-			if strings.HasSuffix(host, rule.DomainPattern[1:]) {
+			domainSuffix := rule.DomainPattern[2:]
+			// 检查域名后缀是否匹配,和*.domain相同的也能匹配上
+			if strings.HasSuffix(host, domainSuffix) {
 				if rule.ForwardMethod == "direct" {
 					upstreamHost = direct_upstream
 				} else {
