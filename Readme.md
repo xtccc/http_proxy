@@ -22,6 +22,8 @@ rules:
     forwardMethod: "direct" # direct or proxy
   - domainPattern: "google.com" # Exact match 
     forwardMethod: "proxy"
+  - domainPattern: "*.baidu.com"
+    forwardMethod: "block" # block site
 ```
 
 ## Installation

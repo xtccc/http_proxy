@@ -10,8 +10,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strings"
-
-	"github.com/sirupsen/logrus"
 )
 
 func createHTTPRequest(reqline string, body []byte) (*http.Request, error) {
@@ -45,11 +43,11 @@ func handleConnectRequest_http(conn net.Conn, req *http.Request) {
 	} else if ForwardMethod == "direct" {
 		handleConnection_http(conn, req)
 
-	} else {
-		logrus.Error("ForwardMethod is wrong", ForwardMethod)
+	} else if ForwardMethod == "block" {
+		conn.Close()
+		//让客户端连接直接关闭
 		return
 	}
-
 }
 
 // 添加辅助函数来记录传输的字节数

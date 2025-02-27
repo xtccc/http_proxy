@@ -80,8 +80,6 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.mijia.tech"
     forwardMethod: "direct"
-  - domainPattern: "*.baidu.com"
-    forwardMethod: "direct"
   - domainPattern: "*.cainiao.com"
     forwardMethod: "direct"
   - domainPattern: "*.gitee.com"
@@ -128,5 +126,9 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.yuewen.com"
     forwardMethod: "direct"
+  - domainPattern: "*.mi-img.com"
+    forwardMethod: "direct"
+  - domainPattern: "*.baidu.com"
+    forwardMethod: "block"
     
     

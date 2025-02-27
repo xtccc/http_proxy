@@ -20,6 +20,8 @@ rules:
     forwardMethod: "direct" # direct或proxy
   - domainPattern: "google.com" # 精确匹配
     forwardMethod: "proxy"
+  - domainPattern: "*.baidu.com"
+    forwardMethod: "block" # 阻止网站    
 ```
 
 ## 安装说明

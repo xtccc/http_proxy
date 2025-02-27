@@ -113,6 +113,9 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn, host s
 
 		forward_io_copy(conn, targetConn, upstreamHost, forward_method, host)
 
+	} else if forward_method == "block" {
+		//让客户端连接直接关闭
+		conn.Close()
 	}
 
 }
