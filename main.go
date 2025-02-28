@@ -156,7 +156,18 @@ func handleConnectRequest(conn net.Conn) {
 	case "CONNECT":
 		handleConnectRequest_https(conn, target, reqLine)
 		//除了CONNECT其余的都是http的协议，转给http的上游
+
 	default:
+		//为了给 fastgpt 的https get 做适配
+		// 如果是 HTTPS 请求（GET等），则模拟 CONNECT 请求进行隧道处理
+		if isHTTPS(reqLine) {
+			// 使用 CONNECT 方法来处理隧道建立
+			method = "CONNECT" // 强制转换为 CONNECT
+
+			// 然后调用 https 请求的处理函数
+			handleConnectRequest_https(conn, target, reqLine)
+			return
+		}
 		req, err := createHTTPRequest(reqLine, body)
 		if err != nil {
 			log.Printf("Failed to create HTTP request: %v", err)
