@@ -141,20 +141,26 @@ func handleConnectRequest(conn net.Conn) {
 var domainForwardMap Config
 var proxyAddr *string
 
+func loglevel_set(loglevel *string) {
+	if *loglevel == "info" || *loglevel == "Info" {
+		logrus.SetLevel(logrus.InfoLevel)
+	}
+
+	if *loglevel == "debug" || *loglevel == "Debug" {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
+	logrus.Info("日志等级为:", logrus.GetLevel())
+}
 func main() {
 	// 解析命令行参数
 	listenAddr := flag.String("listen", ":8080", "监听地址，格式为[host]:port")
 	proxyAddr = flag.String("proxy", "127.0.0.1:8079", "监听地址，格式为[host]:port")
-
+	loglevel := flag.String("log", "Info", "日志等级 Info Debug")
 	flag.Parse()
+	loglevel_set(loglevel)
 
-	// 创建一个日志文件
-	file, err := os.OpenFile("http_proxy.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		logrus.Fatal(err)
-	}
-	// 设置输出到文件
-	logrus.SetOutput(file)
+	// 设置输出到标准输出
+	logrus.SetOutput(os.Stdout)
 
 	domainForwardMap = LoadConfig()
 
@@ -169,15 +175,13 @@ func main() {
 	defer listener.Close()
 
 	hello := fmt.Sprintf("Proxy server is running on %s\n", *listenAddr)
-	logrus.Errorln(hello)
-	fmt.Println(hello)
+	logrus.Info(hello)
 
 	// 接受连接
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			logrus.Errorln("Error accepting connection:", err)
-			fmt.Println("Error accepting connection:", err)
 			continue
 		}
 
