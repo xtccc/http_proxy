@@ -174,7 +174,7 @@ func main() {
 
 	defer listener.Close()
 
-	hello := fmt.Sprintf("Proxy server is running on %s\n", *listenAddr)
+	hello := fmt.Sprintf("Proxy server is running on %s", *listenAddr)
 	logrus.Info(hello)
 
 	// 接受连接
