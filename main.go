@@ -102,7 +102,7 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 		upstreamHost = direct_upstream
 		logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, "direct", upstreamHost)
 		// 记录请求计数
-		forwardedRequests.WithLabelValues(protocol, host, "direct").Inc()
+		forwardedRequests.WithLabelValues(protocol, "direct").Inc()
 		return upstreamHost, "direct"
 	}
 
@@ -130,7 +130,7 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 	// 默认使用代理
 	logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, "proxy", proxy_upstream)
 	// 记录请求计数
-	forwardedRequests.WithLabelValues(protocol, host, "proxy").Inc()
+	forwardedRequests.WithLabelValues(protocol, "proxy").Inc()
 	return proxy_upstream, "proxy"
 }
 
