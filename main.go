@@ -22,7 +22,7 @@ var (
 			Name: "proxy_forwarded_requests_total",
 			Help: "转发请求的总数，按协议、主机和转发方式统计",
 		},
-		[]string{"protocol", "host", "method"},
+		[]string{"protocol", "method"},
 	)
 
 	forwardedBytes = prometheus.NewCounterVec(
@@ -30,7 +30,7 @@ var (
 			Name: "proxy_forwarded_bytes_total",
 			Help: "转发流量的总字节数，按协议、主机和转发方式统计",
 		},
-		[]string{"protocol", "host", "method"},
+		[]string{"protocol", "method"},
 	)
 )
 
@@ -79,7 +79,7 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 				}
 				logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, rule.ForwardMethod, upstreamHost)
 				// 记录请求计数
-				forwardedRequests.WithLabelValues(protocol, host, rule.ForwardMethod).Inc()
+				forwardedRequests.WithLabelValues(protocol, rule.ForwardMethod).Inc()
 				return upstreamHost, rule.ForwardMethod
 			}
 		} else if host == rule.DomainPattern {
@@ -91,7 +91,7 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 			// 精确匹配域名
 			logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, rule.ForwardMethod, upstreamHost)
 			// 记录请求计数
-			forwardedRequests.WithLabelValues(protocol, host, rule.ForwardMethod).Inc()
+			forwardedRequests.WithLabelValues(protocol, rule.ForwardMethod).Inc()
 			return upstreamHost, rule.ForwardMethod
 		}
 	}
@@ -115,14 +115,14 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 			method = "proxy"
 			logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, method, upstreamHost)
 			// 记录请求计数
-			forwardedRequests.WithLabelValues(protocol, host, method).Inc()
+			forwardedRequests.WithLabelValues(protocol, method).Inc()
 			return
 		} else {
 			upstreamHost = direct_upstream
 			method = "direct"
 			logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, method, upstreamHost)
 			// 记录请求计数
-			forwardedRequests.WithLabelValues(protocol, host, method).Inc()
+			forwardedRequests.WithLabelValues(protocol, method).Inc()
 			return
 		}
 	}

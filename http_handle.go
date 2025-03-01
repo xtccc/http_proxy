@@ -52,7 +52,7 @@ func handleConnectRequest_http(conn net.Conn, req *http.Request) {
 
 // 添加辅助函数来记录传输的字节数
 func recordTransferredBytes(protocol, host, method string, bytes int64) {
-	forwardedBytes.WithLabelValues(protocol, host, method).Add(float64(bytes))
+	forwardedBytes.WithLabelValues(protocol, method).Add(float64(bytes))
 }
 
 // 修改 handleConnection_http 函数

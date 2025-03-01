@@ -133,7 +133,7 @@ func forward_io_copy(conn, targetConn net.Conn, upstreamHost, forward_method, ho
 		if err != nil {
 			errCh <- fmt.Errorf("error copying data to upstream: %w", err)
 		}
-		forwardedBytes.WithLabelValues("https", host, forward_method).Add(float64(written))
+		forwardedBytes.WithLabelValues("https", forward_method).Add(float64(written))
 	}()
 
 	// 转发 targetConn -> conn
@@ -143,7 +143,7 @@ func forward_io_copy(conn, targetConn net.Conn, upstreamHost, forward_method, ho
 		if err != nil {
 			errCh <- fmt.Errorf("error copying data to client: %w", err)
 		}
-		forwardedBytes.WithLabelValues("https", host, forward_method).Add(float64(written))
+		forwardedBytes.WithLabelValues("https", forward_method).Add(float64(written))
 	}()
 
 	// 等待转发完成
