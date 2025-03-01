@@ -50,11 +50,6 @@ func handleConnectRequest_http(conn net.Conn, req *http.Request) {
 	}
 }
 
-// 添加辅助函数来记录传输的字节数
-func recordTransferredBytes(protocol, host, method string, bytes int64) {
-	forwardedBytes.WithLabelValues(protocol, method).Add(float64(bytes))
-}
-
 // 修改 handleConnection_http 函数
 func handleConnection_http(clientConn net.Conn, req *http.Request) {
 	defer clientConn.Close()
@@ -82,13 +77,11 @@ func handleConnection_http(clientConn net.Conn, req *http.Request) {
 		log.Printf("Failed to dump request: %v", err)
 		return
 	}
-	written, err := targetConn.Write(reqBytes)
+	_, err = targetConn.Write(reqBytes)
 	if err != nil {
 		log.Printf("Failed to forward request: %v", err)
 		return
 	}
-	// 记录请求的字节数
-	recordTransferredBytes("http", req.Host, "direct", int64(written))
 
 	// 读取目标服务器的响应
 	resp, err := http.ReadResponse(bufio.NewReader(targetConn), req)
@@ -104,13 +97,12 @@ func handleConnection_http(clientConn net.Conn, req *http.Request) {
 		log.Printf("Failed to dump response: %v", err)
 		return
 	}
-	written, err = clientConn.Write(respBytes)
+	_, err = clientConn.Write(respBytes)
 	if err != nil {
 		log.Printf("Failed to send response to client: %v", err)
 		return
 	}
-	// 记录响应的字节数
-	recordTransferredBytes("http", req.Host, "direct", int64(written))
+
 }
 
 // 修改 handleConnection_http_proxy 函数
@@ -133,13 +125,11 @@ func handleConnection_http_proxy(clientConn net.Conn, req *http.Request, upstrea
 		log.Printf("Failed to dump request: %v", err)
 		return
 	}
-	written, err := upstreamConn.Write(reqBytes)
+	_, err = upstreamConn.Write(reqBytes)
 	if err != nil {
 		log.Printf("Failed to forward request to upstream: %v", err)
 		return
 	}
-	// 记录请求的字节数
-	recordTransferredBytes("http", req.Host, "proxy", int64(written))
 
 	// 读取上游代理的响应
 	resp, err := http.ReadResponse(bufio.NewReader(upstreamConn), req)
@@ -155,13 +145,12 @@ func handleConnection_http_proxy(clientConn net.Conn, req *http.Request, upstrea
 		log.Printf("Failed to dump response: %v", err)
 		return
 	}
-	written, err = clientConn.Write(respBytes)
+	_, err = clientConn.Write(respBytes)
 	if err != nil {
 		log.Printf("Failed to send response to client: %v", err)
 		return
 	}
-	// 记录响应的字节数
-	recordTransferredBytes("http", req.Host, "proxy", int64(written))
+
 }
 
 // 读取 HTTP 请求头直到遇到空行

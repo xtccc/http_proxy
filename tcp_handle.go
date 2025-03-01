@@ -95,7 +95,7 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn, host s
 			logrus.Errorln("Error forwarding response to client:", err)
 			return
 		}
-		forward_io_copy(conn, upstreamConn, upstreamHost, forward_method, host)
+		forward_io_copy(conn, upstreamConn)
 	} else if forward_method == "direct" {
 
 		targetConn, err := net.Dial("tcp", upstreamHost)
@@ -111,7 +111,7 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn, host s
 
 		//targetConn.SetWriteDeadline(time.Time{}) // 清除写入超时
 
-		forward_io_copy(conn, targetConn, upstreamHost, forward_method, host)
+		forward_io_copy(conn, targetConn)
 
 	} else if forward_method == "block" {
 		//让客户端连接直接关闭
@@ -120,7 +120,7 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn, host s
 
 }
 
-func forward_io_copy(conn, targetConn net.Conn, upstreamHost, forward_method, host string) {
+func forward_io_copy(conn, targetConn net.Conn) {
 	// 使用 channel 和 WaitGroup 来管理双向转发
 	errCh := make(chan error, 2)
 	wg := &sync.WaitGroup{}
@@ -129,21 +129,19 @@ func forward_io_copy(conn, targetConn net.Conn, upstreamHost, forward_method, ho
 	// 转发 conn -> targetConn
 	go func() {
 		defer wg.Done()
-		written, err := io.Copy(targetConn, conn)
+		_, err := io.Copy(targetConn, conn)
 		if err != nil {
 			errCh <- fmt.Errorf("error copying data to upstream: %w", err)
 		}
-		forwardedBytes.WithLabelValues("https", forward_method).Add(float64(written))
 	}()
 
 	// 转发 targetConn -> conn
 	go func() {
 		defer wg.Done()
-		written, err := io.Copy(conn, targetConn)
+		_, err := io.Copy(conn, targetConn)
 		if err != nil {
 			errCh <- fmt.Errorf("error copying data to client: %w", err)
 		}
-		forwardedBytes.WithLabelValues("https", forward_method).Add(float64(written))
 	}()
 
 	// 等待转发完成
