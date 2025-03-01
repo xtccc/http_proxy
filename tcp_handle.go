@@ -60,11 +60,11 @@ func handleConnectRequest_https(conn net.Conn, target, reqLine string) {
 	upstream, ForwardMethod := getForwardMethodForHost(proxy_upstream, host, port, "https")
 
 	// 调用 forward 函数进行请求转发
-	forward(upstream, ForwardMethod, reqLine, conn, host)
+	forward(upstream, ForwardMethod, reqLine, conn)
 
 }
 
-func forward(upstreamHost, forward_method, reqLine string, conn net.Conn, host string) {
+func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 
 	if forward_method == "proxy" {
 		// 尝试连接到目标服务器
