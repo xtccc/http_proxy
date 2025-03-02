@@ -156,7 +156,13 @@ func main() {
 	listenAddr := flag.String("listen", ":8080", "监听地址，格式为[host]:port")
 	proxyAddr = flag.String("proxy", "127.0.0.1:8079", "监听地址，格式为[host]:port")
 	loglevel := flag.String("log", "Info", "日志等级 Info Debug")
+	enable_pprof := flag.Bool("enable_pprof", false, "是否启用pprof")
+
 	flag.Parse()
+
+	if *enable_pprof {
+		init_pprof()
+	}
 	loglevel_set(loglevel)
 
 	// 设置输出到标准输出
