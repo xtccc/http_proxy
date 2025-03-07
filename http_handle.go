@@ -59,10 +59,11 @@ func handleConnection_http(clientConn net.Conn, req *http.Request) {
 	} else {
 		addr = req.URL.Host
 	}
-
-	if strings.Contains(req.RequestURI, req.URL.Host) {
-		newRUI := strings.Split(req.RequestURI, req.URL.Host)[1]
-		req.RequestURI = newRUI
+	if req.URL.Host != "" {
+		if strings.Contains(req.RequestURI, req.URL.Host) {
+			newRUI := strings.Split(req.RequestURI, req.URL.Host)[1]
+			req.RequestURI = newRUI
+		}
 	}
 	targetConn, err := net.Dial("tcp", addr)
 	if err != nil {
