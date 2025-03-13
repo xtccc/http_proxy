@@ -138,4 +138,6 @@ rules:
     forwardMethod: "direct"    
   - domainPattern: "*.autonavi.com"
     forwardMethod: "direct"        
+  - domainPattern: "*.u-area.com"
+    forwardMethod: "direct"        
     
