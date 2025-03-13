@@ -132,5 +132,8 @@ rules:
     forwardMethod: "block"
   - domainPattern: "dash.cloudflare.com"
     forwardMethod: "direct"    
-    
+  - domainPattern: "*.douban.com"
+    forwardMethod: "direct"
+  - domainPattern: "*.doubanio.com"
+    forwardMethod: "direct"    
     
