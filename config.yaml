@@ -136,4 +136,6 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.doubanio.com"
     forwardMethod: "direct"    
+  - domainPattern: "*.autonavi.com"
+    forwardMethod: "direct"        
     
