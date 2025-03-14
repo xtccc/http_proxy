@@ -1,4 +1,4 @@
-module http_proxy
+module github.com/xtccc/http_proxy
 
 go 1.23
 
