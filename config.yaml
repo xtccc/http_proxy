@@ -140,6 +140,6 @@ rules:
     forwardMethod: "direct"        
   - domainPattern: "*.u-area.com"
     forwardMethod: "direct"        
-  - domainPattern: "*wellcee.com"
+  - domainPattern: "*.wellcee.com"
     forwardMethod: "direct"        
     
