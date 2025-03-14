@@ -36,6 +36,11 @@ rules:
 go build -o proxy
 ```
 
+
+```bash
+go install github.com/xtccc/http_proxy@latest
+```
+
 ## Usage
 
 Start the proxy server:

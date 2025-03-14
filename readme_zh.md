@@ -34,6 +34,11 @@ rules:
 go build -o proxy
 ```
 
+或者使用go install 安装
+```bash
+go install github.com/xtccc/http_proxy@latest
+```
+
 ## 使用方法
 
 启动代理服务器：
