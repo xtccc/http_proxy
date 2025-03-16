@@ -2,6 +2,8 @@
 
 一个基于Go语言开发的高性能HTTP代理服务器，支持基于域名的转发规则。
 
+
+[http_proxy介绍的博客](https://blog.smallparking.eu.org/posts/http_proxy/)
 ## 功能特性
 
 - 🚀 高性能代理服务器
