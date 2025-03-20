@@ -12,6 +12,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+func logConnectionType(upstreamHost string, conn net.Conn) {
+	if tcpAddr, ok := conn.LocalAddr().(*net.TCPAddr); ok {
+		ip_type := "ipv4"
+		if tcpAddr.IP.To4() == nil {
+			ip_type = "ipv6"
+		}
+		logrus.Debugf("%s Connected to %s : %s", upstreamHost, ip_type, conn.RemoteAddr().String())
+	}
+}
+
 func readRequestHeaderAndBody(conn net.Conn) (string, []byte, error) {
 	reader := bufio.NewReader(conn)
 	var requestBuilder strings.Builder
@@ -103,6 +113,7 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 			logrus.Errorln("Error connecting to target:", err)
 			return
 		}
+		logConnectionType(upstreamHost, targetConn)
 		_, err = conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 		if err != nil {
 			logrus.Errorln("Error writing to client:", err)
