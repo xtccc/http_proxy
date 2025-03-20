@@ -146,3 +146,5 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.ksosoft.com"
     forwardMethod: "direct"
+  - domainPattern: "*.xiaomiyoupin.com"
+    forwardMethod: "direct"            
