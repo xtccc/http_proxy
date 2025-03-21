@@ -105,7 +105,7 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 			logrus.Errorln("Error forwarding response to client:", err)
 			return
 		}
-		forward_io_copy(conn, upstreamConn)
+		forward_io_copy(conn, upstreamConn, forward_method)
 	} else if forward_method == "direct" {
 
 		targetConn, err := net.Dial("tcp", upstreamHost)
@@ -122,16 +122,14 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 
 		//targetConn.SetWriteDeadline(time.Time{}) // 清除写入超时
 
-		forward_io_copy(conn, targetConn)
-
+		forward_io_copy(conn, targetConn, forward_method)
 	} else if forward_method == "block" {
 		//让客户端连接直接关闭
 		conn.Close()
 	}
 
 }
-
-func forward_io_copy(conn, targetConn net.Conn) {
+func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 	// 使用 channel 和 WaitGroup 来管理双向转发
 	errCh := make(chan error, 2)
 	wg := &sync.WaitGroup{}
@@ -140,18 +138,33 @@ func forward_io_copy(conn, targetConn net.Conn) {
 	// 转发 conn -> targetConn
 	go func() {
 		defer wg.Done()
-		_, err := io.Copy(targetConn, conn)
+		client_n, err := io.Copy(targetConn, conn)
 		if err != nil {
 			errCh <- fmt.Errorf("error copying data to upstream: %w", err)
+		}
+
+		if forward_method == "proxy" {
+			ProxyUploadBytes.Add(float64(client_n))
+			logrus.Debugf("proxy upload add %d", client_n)
+		} else {
+			directUploadBytes.Add(float64(client_n))
+			logrus.Debugf("direct upload add %d", client_n)
 		}
 	}()
 
 	// 转发 targetConn -> conn
 	go func() {
 		defer wg.Done()
-		_, err := io.Copy(conn, targetConn)
+		server_return_n, err := io.Copy(conn, targetConn)
 		if err != nil {
 			errCh <- fmt.Errorf("error copying data to client: %w", err)
+		}
+		if forward_method == "proxy" {
+			ProxyDownloadBytes.Add(float64(server_return_n))
+			logrus.Debugf("proxy download add %d", server_return_n)
+		} else {
+			DirectDownloadBytes.Add(float64(server_return_n))
+			logrus.Debugf("proxy download add %d", server_return_n)
 		}
 	}()
 

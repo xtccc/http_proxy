@@ -158,6 +158,7 @@ func main() {
 	loglevel := flag.String("log", "Info", "日志等级 Info Debug")
 	enable_pprof := flag.Bool("enable_pprof", false, "是否启用pprof")
 	version := flag.Bool("version", false, "是否显示版本")
+	listenAddr_prometheus := flag.String("listen_prometheus", ":9988", "prometheus 指标 监听地址，格式为:port")
 
 	flag.Parse()
 	if *version {
@@ -171,6 +172,14 @@ func main() {
 
 	// 设置输出到标准输出
 	logrus.SetOutput(os.Stdout)
+
+	//初始化prometheus
+	err := prometheus_init(*listenAddr_prometheus)
+	if err != nil {
+		logrus.Errorln("Error starting server:", err)
+		fmt.Println("Error starting server:", err)
+		return
+	}
 
 	domainForwardMap = LoadConfig()
 
