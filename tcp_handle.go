@@ -153,7 +153,7 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 		defer wg.Done()
 		var downloadCounter prometheus.Counter
 		if forward_method == "proxy" {
-			downloadCounter = ProxyUploadBytes
+			downloadCounter = ProxyUploadBytes // 这个proxy 上传好像记录的不对，但是不知道如何修复 todo
 		} else {
 			downloadCounter = directUploadBytes
 		}
