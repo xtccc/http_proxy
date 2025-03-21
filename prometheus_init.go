@@ -29,18 +29,14 @@ var (
 
 	// 直连上传流量 (字节)
 	directUploadBytes = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "myapp_direct_upload_bytes_total",
+		Name: "http_direct_upload_bytes_total",
 		Help: "Total bytes uploaded directly.",
 	})
 )
 
 // main 	http.Handle("/metrics", promhttp.Handler())
 func prometheus_init(listenAddr_prometheus string) error {
-	// 启动prometheus服务
 	http.Handle("/metrics", promhttp.Handler())
 	err := http.ListenAndServe(listenAddr_prometheus, nil)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }

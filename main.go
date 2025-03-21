@@ -173,13 +173,14 @@ func main() {
 	// 设置输出到标准输出
 	logrus.SetOutput(os.Stdout)
 
-	//初始化prometheus
-	err := prometheus_init(*listenAddr_prometheus)
-	if err != nil {
-		logrus.Errorln("Error starting server:", err)
-		fmt.Println("Error starting server:", err)
-		return
-	}
+	go func() {
+		// 初始化prometheus
+		err := prometheus_init(*listenAddr_prometheus)
+		if err != nil {
+			logrus.Errorln("Error starting server:", err)
+			os.Exit(1)
+		}
+	}()
 
 	domainForwardMap = LoadConfig()
 
