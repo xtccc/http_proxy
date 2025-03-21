@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
 
@@ -129,6 +130,17 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 	}
 
 }
+
+type countingWriter struct {
+	counter prometheus.Counter
+}
+
+func (cw *countingWriter) Write(p []byte) (int, error) {
+	n := len(p)
+	cw.counter.Add(float64(n))
+	return n, nil
+}
+
 func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 	// 使用 channel 和 WaitGroup 来管理双向转发
 	errCh := make(chan error, 2)
@@ -137,35 +149,41 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 
 	// 转发 conn -> targetConn
 	go func() {
+
 		defer wg.Done()
-		client_n, err := io.Copy(targetConn, conn)
+		var downloadCounter prometheus.Counter
+		if forward_method == "proxy" {
+			downloadCounter = ProxyUploadBytes
+		} else {
+			downloadCounter = directUploadBytes
+		}
+		teeReader := io.TeeReader(conn, &countingWriter{counter: downloadCounter})
+		client_return_n, err := io.Copy(targetConn, teeReader)
 		if err != nil {
 			errCh <- fmt.Errorf("error copying data to upstream: %w", err)
 		}
 
-		if forward_method == "proxy" {
-			ProxyUploadBytes.Add(float64(client_n))
-			logrus.Debugf("proxy upload add %d", client_n)
-		} else {
-			directUploadBytes.Add(float64(client_n))
-			logrus.Debugf("direct upload add %d", client_n)
-		}
+		logrus.Debugf("Total bytes uploaded: %d", client_return_n)
 	}()
 
 	// 转发 targetConn -> conn
 	go func() {
 		defer wg.Done()
-		server_return_n, err := io.Copy(conn, targetConn)
+		var downloadCounter prometheus.Counter
+		if forward_method == "proxy" {
+			downloadCounter = ProxyDownloadBytes
+		} else {
+			downloadCounter = DirectDownloadBytes
+		}
+		// 读取targetConn 的同时将数据写入countingWriter ，返回的reader 用于读取
+		teeReader := io.TeeReader(targetConn, &countingWriter{counter: downloadCounter})
+
+		server_return_n, err := io.Copy(conn, teeReader)
 		if err != nil {
 			errCh <- fmt.Errorf("error copying data to client: %w", err)
 		}
-		if forward_method == "proxy" {
-			ProxyDownloadBytes.Add(float64(server_return_n))
-			logrus.Debugf("proxy download add %d", server_return_n)
-		} else {
-			DirectDownloadBytes.Add(float64(server_return_n))
-			logrus.Debugf("proxy download add %d", server_return_n)
-		}
+		logrus.Debugf("Total bytes downloaded: %d", server_return_n)
+
 	}()
 
 	// 等待转发完成
