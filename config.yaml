@@ -147,4 +147,7 @@ rules:
   - domainPattern: "*.ksosoft.com"
     forwardMethod: "direct"
   - domainPattern: "*.xiaomiyoupin.com"
-    forwardMethod: "direct"            
+    forwardMethod: "direct"
+  - domainPattern: "b23.tv"
+    forwardMethod: "direct"
+    
