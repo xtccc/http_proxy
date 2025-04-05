@@ -32,6 +32,14 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 	direct_upstream := host + ":" + port
 	// 遍历映射规则
 	for _, rule := range domainForwardMap.Rules {
+		//全局直连 用于纯粹的转发http流量
+		if rule.DomainPattern == "*" && rule.ForwardMethod == "direct" {
+			upstreamHost = direct_upstream
+			logrus.Infof("全局直连规则: protocol: %s host: %s method: %s upstream: %s", protocol, host, rule.ForwardMethod, upstreamHost)
+			method = rule.ForwardMethod
+			return
+		}
+
 		// 如果是通配符匹配（例如 *.douyu.cn）
 		if strings.HasPrefix(rule.DomainPattern, "*.") {
 

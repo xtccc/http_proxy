@@ -74,6 +74,18 @@ rules:
     forwardMethod: "direct"
 ```
 
+## Global Direct Connection Configuration
+
+To enable global direct connection, add the following rule to your `config.yaml`:
+
+```yaml
+rules:
+  - domainPattern: "*"
+    forwardMethod: "direct"
+```
+
+This configuration will forward all HTTP/HTTPS traffic directly without using the proxy server. Use with caution.
+
 ## License
 
 GPLv3

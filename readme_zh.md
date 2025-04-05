@@ -74,6 +74,19 @@ rules:
     forwardMethod: "direct"
 ```
 
+
+## 全局直连配置
+
+要启用全局直连，请将以下规则添加到您的 `config.yaml`：
+
+```yaml
+rules:
+  - domainPattern: "*"
+    forwardMethod: "direct"
+```
+
+此配置将直接转发所有 HTTP/HTTPS 流量，而不使用代理服务器。请谨慎使用。
+
 ## 许可证
 
 GNU通用公共许可证v3.0 (GPLv3)
