@@ -114,7 +114,7 @@ func handleConnectRequest(conn net.Conn) {
 	// 格式为 CONNECT www.google.com:443 HTTP/1.1
 	parts := strings.Split(reqLine, " ")
 	if len(parts) < 3 {
-		logrus.Errorln("Invalid CONNECT request format")
+		logrus.Errorf("Invalid CONNECT request format,reqLine: %s", reqLine)
 		return
 	}
 

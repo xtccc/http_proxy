@@ -62,7 +62,7 @@ func readRequestHeaderAndBody(conn net.Conn) (string, []byte, error) {
 func handleConnectRequest_https(conn net.Conn, target, reqLine string) {
 	hostPort := strings.Split(target, ":")
 	if len(hostPort) != 2 {
-		logrus.Errorln("Invalid target format")
+		logrus.Errorf("Invalid target format ,target: %s", target)
 		return
 	}
 
