@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"strconv"
 	"strings"
@@ -188,8 +189,14 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 
 	// 等待转发完成
 	wg.Wait()
-	targetConn.Close()
-	conn.Close()
+	err := targetConn.Close()
+	if err != nil {
+		slog.Error(fmt.Sprintf("targetConn.Close: %s", err.Error()))
+	}
+	err = conn.Close()
+	if err != nil {
+		slog.Error(fmt.Sprintf("conn.Close: %s", err.Error()))
+	}
 	close(errCh)
 
 }
