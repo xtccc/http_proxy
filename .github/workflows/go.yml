@@ -41,7 +41,12 @@ jobs:
 
           let releaseNotes = `Release notes for tag ${tag}:\n\n`;
           response.data.forEach(commit => {
-            releaseNotes += `- ${commit.commit.message} (${commit.author.login})\n`;
+            // Check if author exists and is not null
+            if (commit.author) {
+              releaseNotes += `- ${commit.commit.message} (${commit.author.login})\n`;
+            } else {
+              releaseNotes += `- ${commit.commit.message} (Author information not available)\n`;
+            }
           });
 
           return releaseNotes;
