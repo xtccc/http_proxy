@@ -152,86 +152,60 @@ func (cw *countingWriter) Write(p []byte) (int, error) {
 }
 
 func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
+	// 使用 channel 和 WaitGroup 来管理双向转发
+	errCh := make(chan error, 2)
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 
-	// 使用 sync.Once 确保连接只被关闭一次
-	var once sync.Once
-	closeConnections := func() {
-		slog.Debug("Closing connections...")
-		err := targetConn.Close()
-		// 忽略 "use of closed network connection" 错误，因为它表示连接已经被另一方关闭或自己关闭了
-		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
-			slog.Error(fmt.Sprintf("targetConn.Close error: %s", err.Error()))
-		}
-		err = conn.Close()
-		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
-			slog.Error(fmt.Sprintf("conn.Close error: %s", err.Error()))
-		}
-	}
-
 	// 转发 conn -> targetConn
 	go func() {
+
 		defer wg.Done()
-		defer once.Do(closeConnections) // 当这个 goroutine 结束时，尝试关闭连接
-
-		var uploadCounter prometheus.Counter
+		var downloadCounter prometheus.Counter
 		if forward_method == "proxy" {
-			uploadCounter = ProxyUploadBytes
+			downloadCounter = ProxyUploadBytes // 这个proxy 上传好像记录的不对，但是不知道如何修复 todo
 		} else {
-			uploadCounter = directUploadBytes
+			downloadCounter = directUploadBytes
 		}
-		teeReader := io.TeeReader(conn, &countingWriter{counter: uploadCounter})
-		logrus.Debugf("before io.Copy (targetConn, teeReader)")
+		teeReader := io.TeeReader(conn, &countingWriter{counter: downloadCounter})
 		client_return_n, err := io.Copy(targetConn, teeReader)
-		logrus.Debugf("after io.Copy (targetConn, teeReader) err: %v", err) // 使用 %v 打印错误
-
-		// 如果是 TCP 连接，尝试关闭写方向，通知对端我们不会再发送数据
-		if tcpConn, ok := targetConn.(interface{ CloseWrite() error }); ok {
-			tcpConn.CloseWrite()
+		if err != nil {
+			errCh <- fmt.Errorf("error copying data to upstream: %w", err)
 		}
 
-		if err != nil && err != io.EOF { // io.EOF 是正常关闭的信号，不应视为错误
-			// 忽略 "use of closed network connection" 因为可能是对方或自己关闭了
-			if !strings.Contains(err.Error(), "use of closed network connection") {
-				logrus.Errorf("error copying data to upstream: %v", err)
-			}
-		}
 		logrus.Debugf("Total bytes uploaded: %d", client_return_n)
 	}()
 
 	// 转发 targetConn -> conn
 	go func() {
 		defer wg.Done()
-		defer once.Do(closeConnections) // 当这个 goroutine 结束时，尝试关闭连接
-
 		var downloadCounter prometheus.Counter
 		if forward_method == "proxy" {
 			downloadCounter = ProxyDownloadBytes
 		} else {
 			downloadCounter = DirectDownloadBytes
 		}
+		// 读取targetConn 的同时将数据写入countingWriter ，返回的reader 用于读取
 		teeReader := io.TeeReader(targetConn, &countingWriter{counter: downloadCounter})
-		logrus.Debugf("before io.Copy (conn, teeReader)")
+
 		server_return_n, err := io.Copy(conn, teeReader)
-		logrus.Debugf("after io.Copy (conn, teeReader) err: %v", err) // 使用 %v 打印错误
-
-		// 如果是 TCP 连接，尝试关闭写方向
-		if tcpConn, ok := conn.(interface{ CloseWrite() error }); ok {
-			tcpConn.CloseWrite()
-		}
-
-		if err != nil && err != io.EOF {
-			if !strings.Contains(err.Error(), "use of closed network connection") {
-				logrus.Errorf("error copying data to client: %v", err)
-			}
+		if err != nil {
+			errCh <- fmt.Errorf("error copying data to client: %w", err)
 		}
 		logrus.Debugf("Total bytes downloaded: %d", server_return_n)
+
 	}()
 
-	// 等待两个 goroutine 都完成（即使它们可能因为错误或关闭而提前退出）
+	// 等待转发完成
 	wg.Wait()
-	slog.Debug("Both io.Copy goroutines finished.")
-	// 确保最终关闭（虽然 once.Do 应该已经处理了，但作为保险）
-	// once.Do(closeConnections) // 这一行可以移除，因为 defer 中已经有了
+	err := targetConn.Close()
+	if err != nil {
+		slog.Error(fmt.Sprintf("targetConn.Close: %s", err.Error()))
+	}
+	err = conn.Close()
+	if err != nil {
+		slog.Error(fmt.Sprintf("conn.Close: %s", err.Error()))
+	}
+	close(errCh)
+
 }

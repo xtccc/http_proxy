@@ -212,9 +212,13 @@ func main() {
 
 	// 定期记录连接数
 	go func() {
+		old_conn := atomic.LoadInt64(&currentConnections)
 		for {
-			logrus.Infof("Current connections: %d", atomic.LoadInt64(&currentConnections))
-			time.Sleep(10 * time.Second)
+			if old_conn != atomic.LoadInt64(&currentConnections) {
+				logrus.Infof("Current connections: %d", atomic.LoadInt64(&currentConnections))
+				old_conn = atomic.LoadInt64(&currentConnections)
+			}
+			time.Sleep(1 * time.Second)
 		}
 	}()
 
