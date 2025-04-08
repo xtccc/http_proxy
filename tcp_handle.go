@@ -158,7 +158,7 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 	// 使用 sync.Once 确保连接只被关闭一次
 	var once sync.Once
 	closeConnections := func() {
-		slog.Info("Closing connections...")
+		slog.Debug("Closing connections...")
 		err := targetConn.Close()
 		// 忽略 "use of closed network connection" 错误，因为它表示连接已经被另一方关闭或自己关闭了
 		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
@@ -231,7 +231,7 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 
 	// 等待两个 goroutine 都完成（即使它们可能因为错误或关闭而提前退出）
 	wg.Wait()
-	slog.Info("Both io.Copy goroutines finished.")
+	slog.Debug("Both io.Copy goroutines finished.")
 	// 确保最终关闭（虽然 once.Do 应该已经处理了，但作为保险）
 	// once.Do(closeConnections) // 这一行可以移除，因为 defer 中已经有了
 }
