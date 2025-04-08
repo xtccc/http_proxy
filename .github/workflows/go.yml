@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - '*' # 当有新的 tag 被 push 时触发
+  workflow_dispatch: # 允许手动触发
+      
 
 jobs:
   release:
