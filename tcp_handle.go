@@ -2,16 +2,16 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"net"
 	"strconv"
 	"strings"
-	"sync"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 func logConnectionType(upstreamHost string, conn net.Conn) {
@@ -151,16 +151,49 @@ func (cw *countingWriter) Write(p []byte) (int, error) {
 	return n, nil
 }
 
+func copyWithCancel(ctx context.Context, targetConn io.Writer, teeReader io.Reader) (int64, error) {
+	var totalCopied int64
+	buf := make([]byte, 1024) // 使用缓冲区来逐步读取数据
+	cr := New(ctx, teeReader)
+
+	for {
+		n, err := cr.Read(buf)
+		if err == io.EOF {
+			// 如果读取完毕，退出
+			logrus.Debug("copyWithCancel 读取完毕，退出")
+			return totalCopied, nil
+		}
+		if err != nil {
+			// 如果读取错误，返回错误
+			logrus.Debug("copyWithCancel 读取错误，返回错误")
+			return totalCopied, err
+		}
+
+		// 将读取的数据写入目标连接
+		nn, err := targetConn.Write(buf[:n])
+		totalCopied += int64(nn)
+		if err != nil {
+			// 如果写入错误，返回错误
+			return totalCopied, err
+		}
+	}
+}
+
 func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
-	// 使用 channel 和 WaitGroup 来管理双向转发
-	errCh := make(chan error, 2)
-	wg := &sync.WaitGroup{}
-	wg.Add(2)
+	defer func() {
+		logrus.Debug("函数forward_io_copy结束")
+	}()
+	logrus.Debug("函数forward_io_copy开始")
+	// 创建一个控制信号的通道
+	done := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// 转发 conn -> targetConn
 	go func() {
 
-		defer wg.Done()
+		defer func() {
+			logrus.Debug("转发 conn -> targetConn 推出")
+		}()
 		var downloadCounter prometheus.Counter
 		if forward_method == "proxy" {
 			downloadCounter = ProxyUploadBytes // 这个proxy 上传好像记录的不对，但是不知道如何修复 todo
@@ -168,44 +201,48 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 			downloadCounter = directUploadBytes
 		}
 		teeReader := io.TeeReader(conn, &countingWriter{counter: downloadCounter})
-		client_return_n, err := io.Copy(targetConn, teeReader)
+		// 	获取返回的通道
+		copied, err := copyWithCancel(ctx, targetConn, teeReader)
 		if err != nil {
-			errCh <- fmt.Errorf("error copying data to upstream: %w", err)
+			logrus.Debugf("Error during copy: %v", err)
+		} else {
+			logrus.Debugf("Total bytes copied: %d", copied)
 		}
+		done <- struct{}{}
 
-		logrus.Debugf("Total bytes uploaded: %d", client_return_n)
 	}()
 
 	// 转发 targetConn -> conn
 	go func() {
-		defer wg.Done()
+		defer func() {
+			logrus.Debug("转发 targetConn -> conn 退出")
+		}()
+
 		var downloadCounter prometheus.Counter
 		if forward_method == "proxy" {
 			downloadCounter = ProxyDownloadBytes
 		} else {
 			downloadCounter = DirectDownloadBytes
 		}
+
 		// 读取targetConn 的同时将数据写入countingWriter ，返回的reader 用于读取
 		teeReader := io.TeeReader(targetConn, &countingWriter{counter: downloadCounter})
-
-		server_return_n, err := io.Copy(conn, teeReader)
+		// 	获取返回的通道
+		copied, err := copyWithCancel(ctx, conn, teeReader)
 		if err != nil {
-			errCh <- fmt.Errorf("error copying data to client: %w", err)
+			logrus.Debugf("Error during copy: %v", err)
+		} else {
+			logrus.Debugf("Total bytes copied: %d", copied)
 		}
-		logrus.Debugf("Total bytes downloaded: %d", server_return_n)
-
+		done <- struct{}{}
 	}()
 
 	// 等待转发完成
-	wg.Wait()
-	err := targetConn.Close()
-	if err != nil {
-		slog.Error(fmt.Sprintf("targetConn.Close: %s", err.Error()))
-	}
-	err = conn.Close()
-	if err != nil {
-		slog.Error(fmt.Sprintf("conn.Close: %s", err.Error()))
-	}
-	close(errCh)
-
+	<-done
+	logrus.Debug("drone 受到了")
+	targetConn.Close()
+	conn.Close()
+	logrus.Debug("开始取消")
+	cancel()
+	logrus.Debug("取消发送")
 }
