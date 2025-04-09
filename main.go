@@ -8,13 +8,9 @@ import (
 	"net"
 	"os"
 	"strings"
-	"sync/atomic"
-	"time"
 
 	"github.com/sirupsen/logrus"
 )
-
-var currentConnections int64
 
 // 判断一个IP地址是否在指定的范围内
 func isInRange(ipStr, startStr, endStr string) bool {
@@ -107,8 +103,6 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 	return proxy_upstream, "proxy"
 }
 func handleConnectRequest(conn net.Conn) {
-	atomic.AddInt64(&currentConnections, 1)
-	defer atomic.AddInt64(&currentConnections, -1)
 	reqLine, body, err := readRequestHeaderAndBody(conn)
 	if err != nil {
 		log.Printf("Failed to read request: %v", err)
@@ -209,18 +203,6 @@ func main() {
 
 	hello := fmt.Sprintf("Proxy server is running on %s", *listenAddr)
 	logrus.Info(hello)
-
-	// 定期记录连接数
-	go func() {
-		old_conn := atomic.LoadInt64(&currentConnections)
-		for {
-			if old_conn != atomic.LoadInt64(&currentConnections) {
-				logrus.Infof("Current connections: %d", atomic.LoadInt64(&currentConnections))
-				old_conn = atomic.LoadInt64(&currentConnections)
-			}
-			time.Sleep(1 * time.Second)
-		}
-	}()
 
 	// 接受连接
 	for {
