@@ -170,7 +170,7 @@ func main() {
 
 	flag.Parse()
 	if *version {
-		fmt.Println("version:", "v1.0.5")
+		fmt.Println("version:", "v1.0.6")
 		os.Exit(0)
 	}
 	if *enable_pprof {
