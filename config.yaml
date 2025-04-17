@@ -150,4 +150,7 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "b23.tv"
     forwardMethod: "direct"
+  - domainPattern: "*.geetest.com"
+    forwardMethod: "direct"
+  
     
