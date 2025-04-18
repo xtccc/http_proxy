@@ -140,16 +140,6 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 
 }
 
-type countingWriter struct {
-	counter prometheus.Counter
-}
-
-func (cw *countingWriter) Write(p []byte) (int, error) {
-	n := len(p)
-	cw.counter.Add(float64(n))
-	return n, nil
-}
-
 func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 	defer func() {
 		logrus.Debug("函数forward_io_copy结束")
@@ -165,10 +155,6 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 	logrus.Debug("函数forward_io_copy开始")
 	// 设置超时时间
 	timeout := 30 * time.Second // 30秒超时
-	conn.SetReadDeadline(time.Now().Add(timeout))
-	conn.SetWriteDeadline(time.Now().Add(timeout))
-	targetConn.SetReadDeadline(time.Now().Add(timeout))
-	targetConn.SetWriteDeadline(time.Now().Add(timeout))
 	var wg sync.WaitGroup
 	wg.Add(2)
 	// 转发 conn -> targetConn
@@ -184,14 +170,35 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 		} else {
 			downloadCounter = directUploadBytes
 		}
-		teeReader := io.TeeReader(conn, &countingWriter{counter: downloadCounter})
-		// 	获取返回的通道
 
-		copied, err := io.Copy(targetConn, teeReader)
-		if err != nil {
-			logrus.Debugf("Error during copy: %v", err)
-		} else {
-			logrus.Debugf("Total bytes copied: %d", copied)
+		// 	获取返回的通道
+		buffer := make([]byte, 4096) // 示例缓冲区大小
+
+		for {
+			// 每次 Read() 操作之前都设置 ReadDeadline (从 conn 读取)
+			conn.SetReadDeadline(time.Now().Add(timeout)) // 不要对 conn 设置 read deadline, 否则 client 慢了会超时
+
+			n, err := conn.Read(buffer)
+			if err != nil {
+				if err == io.EOF {
+					logrus.Debug("conn -> targetConn 连接关闭 (EOF)")
+					return // 连接关闭，退出循环
+				}
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					logrus.Debug("conn -> targetConn 读取超时:", err) //Client 发送超时
+					return                                        // 超时，退出循环
+				}
+				logrus.Errorf("conn -> targetConn 读取错误: %v", err)
+				return // 其他读取错误，退出循环
+			}
+
+			// 将读取到的数据写入 targetConn
+			_, err = targetConn.Write(buffer[:n])
+			if err != nil {
+				logrus.Errorf("conn -> targetConn 写入错误: %v", err)
+				return // 写入错误，退出循环
+			}
+			downloadCounter.Add(float64(n)) // 手动增加计数器
 		}
 	}()
 
@@ -208,18 +215,33 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 		} else {
 			downloadCounter = DirectDownloadBytes
 		}
+		buffer := make([]byte, 4096) // 示例缓冲区大小
 
-		// 读取targetConn 的同时将数据写入countingWriter ，返回的reader 用于读取
-		teeReader := io.TeeReader(targetConn, &countingWriter{counter: downloadCounter})
-		// 	获取返回的通道
-		copied, err := io.Copy(conn, teeReader)
-		if err != nil {
-			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				logrus.Debugf("targetConn -> conn 连接超时，不打印错误,%s", err.Error())
+		for {
+			// 每次 Read() 操作之前都设置 ReadDeadline (从 targetConn 读取)
+			targetConn.SetReadDeadline(time.Now().Add(timeout))
+
+			n, err := targetConn.Read(buffer)
+			if err != nil {
+				if err == io.EOF {
+					logrus.Debug("targetConn -> conn 连接关闭 (EOF)")
+					return // 连接关闭，退出循环
+				}
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					logrus.Debug("targetConn -> conn 读取超时:", err) // 上游发送超时
+					return                                        // 超时，退出循环
+				}
+				logrus.Errorf("targetConn -> conn 读取错误: %v", err)
+				return // 其他读取错误，退出循环
 			}
-			logrus.Debugf("Error during copy: %v", err)
-		} else {
-			logrus.Debugf("Total bytes copied: %d", copied)
+
+			// 将读取到的数据写入 conn
+			_, err = conn.Write(buffer[:n])
+			if err != nil {
+				logrus.Errorf("targetConn -> conn 写入错误: %v", err)
+				return // 写入错误，退出循环
+			}
+			downloadCounter.Add(float64(n)) // 手动增加计数器
 		}
 	}()
 
