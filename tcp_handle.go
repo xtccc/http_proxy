@@ -152,6 +152,7 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 			logrus.Error(err.Error())
 		}
 	}()
+	BufferSize := 1024 * 128
 	logrus.Debug("函数forward_io_copy开始")
 	// 设置超时时间
 	timeout := 30 * time.Second // 30秒超时
@@ -172,7 +173,7 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 		}
 
 		// 	获取返回的通道
-		buffer := make([]byte, 4096) // 示例缓冲区大小
+		buffer := make([]byte, BufferSize) // 示例缓冲区大小
 
 		for {
 			// 每次 Read() 操作之前都设置 ReadDeadline (从 conn 读取)
@@ -215,7 +216,7 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 		} else {
 			downloadCounter = DirectDownloadBytes
 		}
-		buffer := make([]byte, 4096) // 示例缓冲区大小
+		buffer := make([]byte, BufferSize) // 示例缓冲区大小
 
 		for {
 			// 每次 Read() 操作之前都设置 ReadDeadline (从 targetConn 读取)
