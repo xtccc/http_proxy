@@ -152,5 +152,7 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.geetest.com"
     forwardMethod: "direct"
-  
-    
+  - domainPattern: "*.xoyo.com"
+    forwardMethod: "direct"
+  - domainPattern: "*.xoyocdn.com"
+    forwardMethod: "direct"
