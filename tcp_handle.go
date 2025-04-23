@@ -152,7 +152,7 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 			logrus.Error(err.Error())
 		}
 	}()
-	BufferSize := 1024 * 128
+	BufferSize := 1024
 	logrus.Debug("函数forward_io_copy开始")
 	// 设置超时时间
 	timeout := 30 * time.Second // 30秒超时
