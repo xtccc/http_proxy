@@ -121,7 +121,7 @@ func handleConnection_http_proxy(clientConn net.Conn, req *http.Request, upstrea
 	req.URL.Host = req.Host
 
 	// 将请求转发到上游代理
-	reqBytes, err := httputil.DumpRequestOut(req, true)
+	reqBytes, err := httputil.DumpRequest(req, true)
 	if err != nil {
 		log.Printf("Failed to dump request: %v", err)
 		return
