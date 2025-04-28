@@ -162,3 +162,6 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "play.sportsteam368.com"
     forwardMethod: "direct"
+  - domainPattern: "*.netease.com"
+    forwardMethod: "direct"
+
