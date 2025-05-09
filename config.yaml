@@ -164,4 +164,5 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.netease.com"
     forwardMethod: "direct"
-
+  - domainPattern: "my.oschina.net"
+    forwardMethod: "direct"
