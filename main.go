@@ -148,6 +148,7 @@ func handleConnectRequest(conn net.Conn) {
 
 var domainForwardMap Config
 var proxyAddr *string
+var proxyAddrbak *string
 
 func loglevel_set(loglevel *string) {
 	if *loglevel == "info" || *loglevel == "Info" {
@@ -163,6 +164,7 @@ func main() {
 	// 解析命令行参数
 	listenAddr := flag.String("listen", ":8080", "监听地址，格式为[host]:port")
 	proxyAddr = flag.String("proxy", "127.0.0.1:8079", "监听地址，格式为[host]:port")
+	proxyAddrbak = flag.String("proxybak", "127.0.0.1:8078", "监听地址，格式为[host]:port,这是备份的proxy上游，可以为空")
 	loglevel := flag.String("log", "Info", "日志等级 Info Debug")
 	enable_pprof := flag.Bool("enable_pprof", false, "是否启用pprof")
 	version := flag.Bool("version", false, "是否显示版本")
@@ -177,6 +179,10 @@ func main() {
 		init_pprof()
 	}
 	loglevel_set(loglevel)
+	if *proxyAddrbak != "" {
+		//使用备份上游
+		go setup_proxy_bak()
+	}
 
 	// 设置输出到标准输出
 	logrus.SetOutput(os.Stdout)

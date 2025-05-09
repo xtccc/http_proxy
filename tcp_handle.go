@@ -248,29 +248,3 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 
 	wg.Wait()
 }
-
-func proxy_health_check(upstreamConn net.Conn) bool {
-	defer upstreamConn.Close()
-	proxy_website := "www.google.com:443"
-	reqLine := fmt.Sprintf("CONNECT %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: curl/7.88.1\r\nProxy-Connection: Keep-Alive\r\n\r\n", proxy_website, proxy_website)
-
-	// 将客户端的 CONNECT 请求转发给上游代理
-	_, err := upstreamConn.Write([]byte(reqLine))
-	if err != nil {
-		upstreamConn.Close() // 关闭上游连接
-		return false
-	}
-
-	// 读取上游代理的响应
-	upstream_resp, err := readRequestHeader(upstreamConn)
-	if err != nil {
-		upstreamConn.Close() // 关闭上游连接
-		return false
-	}
-	resps := strings.Split(upstream_resp, " ")
-	if len(resps) > 1 && resps[1] == "200" {
-		return true
-
-	}
-	return false
-}
