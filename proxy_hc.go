@@ -14,7 +14,7 @@ func setup_proxy_bak() {
 	// 写一个定时器
 	// 每分钟检测一次上游是否正常，如果不正常，使用 proxyAddrbak 替换  proxyAddr
 	// 替换之前先使用 check_upstream_hc 函数检测一下proxyAddrbak是否正常，不正常还是不替换了
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	for range ticker.C {
