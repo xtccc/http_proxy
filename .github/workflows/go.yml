@@ -16,6 +16,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.ref }}
+        fetch-depth: 0
 
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -24,35 +27,18 @@ jobs:
 
     - name: Build
       run: |
-        TAG=$(git describe --tags --abbrev=0 2>/dev/null)
+        TAG="${GITHUB_REF#refs/tags/}"
+        echo "build version:" $TAG
         go build -ldflags "-X main.version=$TAG" -tags=release -o http_proxy .
-
-    - name: Generate Release Notes
-      id: generate_release_notes
-      uses: actions/github-script@v6
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        script: |
-          const tag = context.ref.replace('refs/tags/', '');
-          const response = await github.rest.repos.listCommits({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            sha: tag
-          });
-
-          let releaseNotes = `Release notes for tag ${tag}:\n\n`;
-          response.data.forEach(commit => {
-            // Check if author exists and is not null
-            if (commit.author) {
-              releaseNotes += `- ${commit.commit.message} (${commit.author.login})\n`;
-            } else {
-              releaseNotes += `- ${commit.commit.message} (Author information not available)\n`;
-            }
-          });
-
-          return releaseNotes;
-        result-encoding: string
+      
+    - name: Get tag description and write release notes
+      run: |
+        tag="${GITHUB_REF#refs/tags/}"
+        desc=$(git tag -l --format='%(contents)' $tag)
+        echo "description: $desc"
+        echo "Release notes for tag $tag" > release_notes.txt
+        echo "" >> release_notes.txt
+        echo "$desc" >> release_notes.txt
 
     - name: Create Release
       id: create_release
@@ -62,7 +48,7 @@ jobs:
       with:
         tag_name: ${{ github.ref_name }}
         release_name: Release ${{ github.ref_name }}
-        body: ${{ steps.generate_release_notes.outputs.result }}
+        body_path: release_notes.txt
         draft: false
         prerelease: false
 
