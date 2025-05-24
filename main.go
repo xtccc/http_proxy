@@ -175,7 +175,11 @@ func main() {
 
 	flag.Parse()
 	if *isversion {
-		fmt.Println("version:", version)
+		if version == "" {
+			fmt.Printf("http_proxy \n    (installed via `go install`, no version info)")
+		} else {
+			fmt.Println("http_proxy version:", version)
+		}
 		os.Exit(0)
 	}
 	if *enable_pprof {
