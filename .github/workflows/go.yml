@@ -33,26 +33,36 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        script: |
-          const tag = context.ref.replace('refs/tags/', '');
-          const response = await github.rest.repos.listCommits({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            sha: tag
-          });
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
 
-          let releaseNotes = `Release notes for tag ${tag}:\n\n`;
-          response.data.forEach(commit => {
-            // Check if author exists and is not null
-            if (commit.author) {
-              releaseNotes += `- ${commit.commit.message} (${commit.author.login})\n`;
-            } else {
-              releaseNotes += `- ${commit.commit.message} (Author information not available)\n`;
+            // 使用 `git show` 命令获取 tag 的描述信息
+            const { exec } = require('child_process');
+
+            function getTagDescription(tagName) {
+              return new Promise((resolve, reject) => {
+                exec(`git show -s --format=%B ${tagName}`, (error, stdout, stderr) => {
+                  if (error) {
+                    console.error(`Error executing git show: ${error}`);
+                    reject(error);
+                    return;
+                  }
+                  if (stderr) {
+                    console.error(`git show stderr: ${stderr}`);
+                  }
+                  resolve(stdout.trim()); // 返回 tag 的描述信息
+                });
+              });
             }
-          });
 
-          return releaseNotes;
-        result-encoding: string
+            // 调用 getTagDescription 函数获取描述信息
+            const tagDescription = await getTagDescription(tag);
+
+            // 构建 release notes
+            const releaseNotes = `Release notes for tag ${tag}:\n\n${tagDescription}`;
+
+            return releaseNotes;
+          result-encoding: string
 
     - name: Create Release
       id: create_release
