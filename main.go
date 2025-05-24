@@ -160,6 +160,9 @@ func loglevel_set(loglevel *string) {
 	}
 	logrus.Info("日志等级为:", logrus.GetLevel())
 }
+
+var version = ""
+
 func main() {
 	// 解析命令行参数
 	listenAddr := flag.String("listen", ":8080", "监听地址，格式为[host]:port")
@@ -167,12 +170,12 @@ func main() {
 	proxyAddrbak = flag.String("proxybak", "127.0.0.1:8078", "监听地址，格式为[host]:port,这是备份的proxy上游，可以为空")
 	loglevel := flag.String("log", "Info", "日志等级 Info Debug")
 	enable_pprof := flag.Bool("enable_pprof", false, "是否启用pprof")
-	version := flag.Bool("version", false, "是否显示版本")
+	isversion := flag.Bool("version", false, "是否显示版本")
 	listenAddr_prometheus := flag.String("listen_prometheus", ":9988", "prometheus 指标 监听地址，格式为:port")
 
 	flag.Parse()
-	if *version {
-		fmt.Println("version:", "v1.0.7")
+	if *isversion {
+		fmt.Println("version:", version)
 		os.Exit(0)
 	}
 	if *enable_pprof {

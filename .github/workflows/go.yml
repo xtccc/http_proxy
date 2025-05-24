@@ -23,7 +23,9 @@ jobs:
         go-version: '1.23'
 
     - name: Build
-      run: go build -o http_proxy .
+      run: |
+        TAG=$(git describe --tags --abbrev=0 2>/dev/null)
+        go build -ldflags "-X main.version=$TAG" -tags=release -o http_proxy .
 
     - name: Generate Release Notes
       id: generate_release_notes
