@@ -155,7 +155,7 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 	BufferSize := 1024
 	logrus.Debug("函数forward_io_copy开始")
 	// 设置超时时间
-	timeout := 30 * time.Second // 30秒超时
+	timeout := 60 * time.Second // 30秒超时
 	var wg sync.WaitGroup
 	wg.Add(2)
 	// 转发 conn -> targetConn
