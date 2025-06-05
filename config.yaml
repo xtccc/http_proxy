@@ -174,3 +174,6 @@ rules:
     forwardMethod: "block"
   - domainPattern: "*.getui.net"
     forwardMethod: "block"
+  - domainPattern: "*.miguvideo.com"
+    forwardMethod: "direct"
+    
