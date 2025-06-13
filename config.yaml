@@ -176,4 +176,5 @@ rules:
     forwardMethod: "block"
   - domainPattern: "*.miguvideo.com"
     forwardMethod: "direct"
-    
+  - domainPattern: "*.fcbox.com"
+    forwardMethod: "direct"    
