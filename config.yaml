@@ -180,3 +180,5 @@ rules:
     forwardMethod: "direct"    
   - domainPattern: "*.huya.com"
     forwardMethod: "direct"
+  - domainPattern: "*.qidian.com"
+    forwardMethod: "direct"
