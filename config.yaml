@@ -220,3 +220,5 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.wmsj.cn"
     forwardMethod: "direct"
+  - domainPattern: "wpad"
+    forwardMethod: "block"
