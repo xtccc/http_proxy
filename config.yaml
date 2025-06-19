@@ -224,3 +224,7 @@ rules:
     forwardMethod: "block"
   - domainPattern: "tpstelemetry.tencent.com"
     forwardMethod: "block"
+  - domainPattern: "stun.hitv.com"
+    forwardMethod: "block"
+  - domainPattern: "stun.chat.bilibili.com"
+    forwardMethod: "block"
