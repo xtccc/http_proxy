@@ -162,7 +162,6 @@ func loglevel_set(loglevel *string) {
 }
 
 var version = ""
-var dns_server *string
 
 func main() {
 	// 解析命令行参数
@@ -173,7 +172,6 @@ func main() {
 	enable_pprof := flag.Bool("enable_pprof", false, "是否启用pprof")
 	isversion := flag.Bool("version", false, "是否显示版本")
 	listenAddr_prometheus := flag.String("listen_prometheus", ":9988", "prometheus 指标 监听地址，格式为:port")
-	dns_server = flag.String("dns_server", "127.0.0.1:53", "DNS 服务器地址，格式为 ip:port")
 
 	flag.Parse()
 	if *isversion {
