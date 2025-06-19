@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -77,6 +78,35 @@ func handleConnectRequest_https(conn net.Conn, target, reqLine string) {
 
 }
 
+func resolveHostWithResolver(hostPort string) (string, error) {
+	host, port, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		return "", err
+	}
+
+	resolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return net.Dial("udp", *dns_server) // 使用全局的 DNS 服务器地址
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	ips, err := resolver.LookupIP(ctx, "ip", host)
+	if err != nil {
+		return "", fmt.Errorf("DNS lookup failed for %s: %v", host, err)
+	}
+
+	if len(ips) == 0 {
+		return "", fmt.Errorf("no IPv4 addresses found for %s", host)
+	}
+
+	ipStr := ips[0].String()
+	logrus.Debugf("Resolved %s to %s", host, ipStr)
+	return net.JoinHostPort(ipStr, port), nil
+}
 func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 
 	if forward_method == "proxy" {
@@ -116,7 +146,11 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 		forward_io_copy(conn, upstreamConn, forward_method)
 	} else if forward_method == "direct" {
 
-		targetConn, err := net.Dial("tcp", upstreamHost)
+		resolvedAddr, err := resolveHostWithResolver(upstreamHost)
+		if err != nil {
+			logrus.Error(err)
+		}
+		targetConn, err := net.Dial("tcp", resolvedAddr)
 		if err != nil {
 			logrus.Errorln("Error connecting to target:", err)
 			conn.Close() // 关闭客户端连接
