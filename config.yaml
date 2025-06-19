@@ -222,3 +222,5 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "wpad"
     forwardMethod: "block"
+  - domainPattern: "tpstelemetry.tencent.com"
+    forwardMethod: "block"
