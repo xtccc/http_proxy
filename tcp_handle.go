@@ -94,7 +94,7 @@ func resolveHostWithResolver(hostPort string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	ips, err := resolver.LookupIP(ctx, "ip", host)
+	ips, err := resolver.LookupIP(ctx, "ip4", host)
 	if err != nil {
 		return "", fmt.Errorf("DNS lookup failed for %s: %v", host, err)
 	}
