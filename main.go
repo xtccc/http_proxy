@@ -186,8 +186,19 @@ func main() {
 		init_pprof()
 	}
 	loglevel_set(loglevel)
+
+	// 检查 proxyAddr 是ip:port还是域名:port
+	err := checkProxyAddr(proxyAddr)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
 	if *proxyAddrbak != "" {
 		//使用备份上游
+		err := checkProxyAddr(proxyAddrbak)
+		if err != nil {
+			logrus.Fatal(err)
+		}
 		go setup_proxy_bak()
 	}
 
@@ -229,4 +240,27 @@ func main() {
 		// 处理 请求
 		go handleConnectRequest(conn)
 	}
+}
+
+func checkProxyAddr(proxyAddr *string) error {
+	host, port, err := net.SplitHostPort(*proxyAddr)
+	if err != nil {
+		return fmt.Errorf("failed to split host and port from proxy address: %v", err)
+	}
+
+	// 尝试将主机部分解析为 IP 地址
+	ip := net.ParseIP(host)
+	if ip != nil {
+		*proxyAddr = ip.String() + ":" + port
+		return nil
+	}
+
+	// 如果不是 IP，则认为是域名
+
+	addr, err := net.ResolveIPAddr("ip4", host)
+	if err != nil {
+		return fmt.Errorf("failed to lookup host: %v", err)
+	}
+	*proxyAddr = addr.String() + ":" + port
+	return nil
 }
