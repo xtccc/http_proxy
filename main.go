@@ -243,6 +243,12 @@ func main() {
 }
 
 func checkProxyAddr(proxyAddr *string) error {
+
+	if *proxyAddr == "" {
+		//如果是默认值或者配置为空,则不报错
+		//因为全局直连功能不需要上游,因此可能配置上游为空
+		return nil
+	}
 	host, port, err := net.SplitHostPort(*proxyAddr)
 	if err != nil {
 		return fmt.Errorf("failed to split host and port from proxy address: %v", err)
