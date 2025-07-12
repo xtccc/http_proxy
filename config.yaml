@@ -228,3 +228,6 @@ rules:
     forwardMethod: "block"
   - domainPattern: "stun.chat.bilibili.com"
     forwardMethod: "block"
+  - domainPattern: "hf-mirror.com"
+    forwardMethod: "direct"
+    
