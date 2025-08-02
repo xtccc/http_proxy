@@ -230,4 +230,5 @@ rules:
     forwardMethod: "block"
   - domainPattern: "hf-mirror.com"
     forwardMethod: "direct"
-    
+  - domainPattern: "*.alibabachengdun.com"
+    forwardMethod: "direct"
