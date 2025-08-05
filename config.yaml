@@ -131,7 +131,7 @@ rules:
   - domainPattern: "hm.baidu.com"
     forwardMethod: "direct"
   - domainPattern: "*.baidu.com"
-    forwardMethod: "block"    
+    forwardMethod: "direct"    
   - domainPattern: "dash.cloudflare.com"
     forwardMethod: "direct"    
   - domainPattern: "*.douban.com"
