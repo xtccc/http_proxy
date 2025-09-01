@@ -232,3 +232,6 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.alibabachengdun.com"
     forwardMethod: "direct"
+  - domainPattern: "xget.xi-xu.me"
+    forwardMethod: "direct"
+  
