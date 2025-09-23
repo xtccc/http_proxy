@@ -236,3 +236,5 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "ele.me"
     forwardMethod: "direct" 
+  - domainPattern: "*.qingcloud.com"
+    forwardMethod: "direct"     
