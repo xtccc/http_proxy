@@ -6,7 +6,7 @@ rules:
     forwardMethod: "proxy"
   - domainPattern: "*.cn"
     forwardMethod: "direct"
-  - domainPattern: "douyu.com"
+  - domainPattern: "*.douyu.com"
     forwardMethod: "direct"
   - domainPattern: "*.douyucdn.cn"
     forwardMethod: "direct"
