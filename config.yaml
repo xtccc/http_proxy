@@ -234,7 +234,7 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "xget.xi-xu.me"
     forwardMethod: "direct"
-  - domainPattern: "ele.me"
+  - domainPattern: "*.ele.me"
     forwardMethod: "direct" 
   - domainPattern: "*.qingcloud.com"
     forwardMethod: "direct"     
