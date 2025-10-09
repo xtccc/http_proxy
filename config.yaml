@@ -248,4 +248,18 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.koolcenter.com"
     forwardMethod: "direct"
+  - domainPattern: "*.mxhichina.com"
+    forwardMethod: "direct"    
+  - domainPattern: "*.bdstatic.com"
+    forwardMethod: "direct"        
+  - domainPattern: "*.126.net"
+    forwardMethod: "direct"   
+  - domainPattern: "*.volceapplog.com"
+    forwardMethod: "direct"
+  - domainPattern: "*.bcebos.com"
+    forwardMethod: "block"
+  - domainPattern: "*.pcbeta.com"
+    forwardMethod: "direct"
+    
   
+
