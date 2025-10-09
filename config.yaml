@@ -260,6 +260,7 @@ rules:
     forwardMethod: "block"
   - domainPattern: "*.pcbeta.com"
     forwardMethod: "direct"
-    
+  - domainPattern: "*.ksyun.com"
+    forwardMethod: "direct"
   
 
