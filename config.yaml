@@ -244,3 +244,8 @@ rules:
     forwardMethod: "direct"     
   - domainPattern: "*.dingtalk.com"
     forwardMethod: "direct"
+  - domainPattern: "*.linkease.com"
+    forwardMethod: "direct"
+  - domainPattern: "*.koolcenter.com"
+    forwardMethod: "direct"
+  
