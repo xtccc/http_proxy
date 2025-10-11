@@ -144,14 +144,13 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 }
 
 func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
+
 	defer func() {
-		// forward_io_copy 结束后，两个连接都将被关闭。
-		logrus.Debug("函数forward_io_copy结束")
 		err := conn.Close()
 		if err != nil {
 			logrus.Error(err.Error())
 		}
-		logrus.Debugf("关闭目标连接 %s -> %s", targetConn.LocalAddr(), targetConn.RemoteAddr())
+		logrus.Debugf("关闭目标连接 %s <-> %s , %s <-> %s", conn.RemoteAddr(), conn.LocalAddr(), targetConn.LocalAddr(), targetConn.RemoteAddr())
 		err = targetConn.Close()
 		if err != nil {
 			logrus.Error(err.Error())
@@ -162,12 +161,13 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 	//var wg sync.WaitGroup
 	//wg.Add(2)
 	ctx, cancel := context.WithCancel(context.Background())
+	infoCh := make(chan string, 1)
 
 	// 转发 conn -> targetConn
 	go func() {
 
 		defer func() {
-			logrus.Debug("转发 conn -> targetConn 退出")
+			infoCh <- fmt.Sprintf("conn %s %s => targetConn %s %s ", conn.RemoteAddr(), conn.LocalAddr(), targetConn.LocalAddr(), targetConn.RemoteAddr())
 			cancel() // 结束后关闭另一边
 		}()
 		var downloadCounter prometheus.Counter
@@ -179,17 +179,16 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 
 		n, err := io.Copy(targetConn, conn)
 		if err != nil {
-			//	logrus.Errorf("conn -> targetConn 读取错误: %v", err)
+			//logrus.Errorf("conn -> targetConn 读取错误: %v", err)
 			return
 		}
 		downloadCounter.Add(float64(n)) // 手动增加计数器
-		cancel()                        // 结束后关闭另一边
 	}()
 
 	// 转发 targetConn -> conn
 	go func() {
 		defer func() {
-			logrus.Debug("转发 targetConn -> conn 退出")
+			infoCh <- fmt.Sprintf("targetConn %s %s => conn  %s %s ", targetConn.LocalAddr(), targetConn.RemoteAddr(), conn.RemoteAddr(), conn.LocalAddr())
 			cancel() // 结束后关闭另一边
 		}()
 
@@ -209,4 +208,6 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 	}()
 
 	<-ctx.Done()
+	name := <-infoCh
+	logrus.Debugf("%s 触发了cancel(),", name)
 }
