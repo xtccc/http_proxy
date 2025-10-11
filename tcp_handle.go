@@ -78,7 +78,8 @@ func handleConnectRequest_https(conn net.Conn, target, reqLine string) {
 }
 func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 
-	if forward_method == "proxy" {
+	switch forward_method {
+	case "proxy":
 		upstreamConn, err := net.Dial("tcp", upstreamHost)
 		if err != nil {
 			logrus.Errorln("Error connecting to target:", err)
@@ -113,7 +114,7 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 			return
 		}
 		forward_io_copy(conn, upstreamConn, forward_method)
-	} else if forward_method == "direct" {
+	case "direct":
 		targetConn, err := net.Dial("tcp", upstreamHost)
 		if err != nil {
 			logrus.Errorln("Error connecting to target:", err)
@@ -131,7 +132,7 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 		}
 
 		forward_io_copy(conn, targetConn, forward_method)
-	} else if forward_method == "block" {
+	case "block":
 		//让客户端连接直接关闭
 		conn.Close()
 	}
