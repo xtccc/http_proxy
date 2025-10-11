@@ -2,13 +2,12 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -21,7 +20,7 @@ func logConnectionType(upstreamHost string, conn net.Conn) {
 		if tcpAddr.IP.To4() == nil {
 			ip_type = "ipv6"
 		}
-		logrus.Debugf("%s Connected to %s : %s", upstreamHost, ip_type, conn.RemoteAddr().String())
+		logrus.Debugf("%s Connected to %s : localaddr:%s remoteaddr:%s", upstreamHost, ip_type, conn.LocalAddr().String(), conn.RemoteAddr().String())
 	}
 }
 
@@ -115,14 +114,18 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 		}
 		forward_io_copy(conn, upstreamConn, forward_method)
 	case "direct":
+		// 对于CONNECT隧道，每个请求都必须是一个新的TCP连接，
+		// 因为隧道的生命周期与客户端的单个会话绑定。
+		// 在这里使用连接池没有意义，因为连接在会话结束后无法被安全地复用。
 		targetConn, err := net.Dial("tcp", upstreamHost)
 		if err != nil {
-			logrus.Errorln("Error connecting to target:", err)
+			logrus.Errorf("Error connecting to target %s: %v", upstreamHost, err)
 			conn.Close() // 关闭客户端连接
 			return
 		}
-		// defer targetConn.Close() // Defer removed, will be closed in forward_io_copy
 		logConnectionType(upstreamHost, targetConn)
+
+		// 告诉客户端隧道已建立
 		_, err = conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 		if err != nil {
 			logrus.Errorln("Error writing to client:", err)
@@ -131,6 +134,7 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 			return
 		}
 
+		// 开始转发数据
 		forward_io_copy(conn, targetConn, forward_method)
 	case "block":
 		//让客户端连接直接关闭
@@ -141,28 +145,30 @@ func forward(upstreamHost, forward_method, reqLine string, conn net.Conn) {
 
 func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 	defer func() {
+		// forward_io_copy 结束后，两个连接都将被关闭。
 		logrus.Debug("函数forward_io_copy结束")
 		err := conn.Close()
 		if err != nil {
 			logrus.Error(err.Error())
 		}
+		logrus.Debugf("关闭目标连接 %s -> %s", targetConn.LocalAddr(), targetConn.RemoteAddr())
 		err = targetConn.Close()
 		if err != nil {
 			logrus.Error(err.Error())
 		}
 	}()
-	BufferSize := 1024
 	logrus.Debug("函数forward_io_copy开始")
-	// 设置超时时间
-	timeout := 60 * time.Second // 30秒超时
-	var wg sync.WaitGroup
-	wg.Add(2)
+
+	//var wg sync.WaitGroup
+	//wg.Add(2)
+	ctx, cancel := context.WithCancel(context.Background())
+
 	// 转发 conn -> targetConn
 	go func() {
 
 		defer func() {
 			logrus.Debug("转发 conn -> targetConn 退出")
-			wg.Done()
+			cancel() // 结束后关闭另一边
 		}()
 		var downloadCounter prometheus.Counter
 		if forward_method == "proxy" {
@@ -171,42 +177,20 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 			downloadCounter = directUploadBytes
 		}
 
-		// 	获取返回的通道
-		buffer := make([]byte, BufferSize) // 示例缓冲区大小
-
-		for {
-			// 每次 Read() 操作之前都设置 ReadDeadline (从 conn 读取)
-			conn.SetReadDeadline(time.Now().Add(timeout)) // 不要对 conn 设置 read deadline, 否则 client 慢了会超时
-
-			n, err := conn.Read(buffer)
-			if err != nil {
-				if err == io.EOF {
-					logrus.Debug("conn -> targetConn 连接关闭 (EOF)")
-					return // 连接关闭，退出循环
-				}
-				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-					logrus.Debug("conn -> targetConn 读取超时:", err) //Client 发送超时
-					return                                        // 超时，退出循环
-				}
-				logrus.Errorf("conn -> targetConn 读取错误: %v", err)
-				return // 其他读取错误，退出循环
-			}
-
-			// 将读取到的数据写入 targetConn
-			_, err = targetConn.Write(buffer[:n])
-			if err != nil {
-				logrus.Errorf("conn -> targetConn 写入错误: %v", err)
-				return // 写入错误，退出循环
-			}
-			downloadCounter.Add(float64(n)) // 手动增加计数器
+		n, err := io.Copy(targetConn, conn)
+		if err != nil {
+			//	logrus.Errorf("conn -> targetConn 读取错误: %v", err)
+			return
 		}
+		downloadCounter.Add(float64(n)) // 手动增加计数器
+		cancel()                        // 结束后关闭另一边
 	}()
 
 	// 转发 targetConn -> conn
 	go func() {
 		defer func() {
 			logrus.Debug("转发 targetConn -> conn 退出")
-			wg.Done()
+			cancel() // 结束后关闭另一边
 		}()
 
 		var downloadCounter prometheus.Counter
@@ -215,35 +199,14 @@ func forward_io_copy(conn, targetConn net.Conn, forward_method string) {
 		} else {
 			downloadCounter = DirectDownloadBytes
 		}
-		buffer := make([]byte, BufferSize) // 示例缓冲区大小
-
-		for {
-			// 每次 Read() 操作之前都设置 ReadDeadline (从 targetConn 读取)
-			targetConn.SetReadDeadline(time.Now().Add(timeout))
-
-			n, err := targetConn.Read(buffer)
-			if err != nil {
-				if err == io.EOF {
-					logrus.Debug("targetConn -> conn 连接关闭 (EOF)")
-					return // 连接关闭，退出循环
-				}
-				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-					logrus.Debug("targetConn -> conn 读取超时:", err) // 上游发送超时
-					return                                        // 超时，退出循环
-				}
-				logrus.Errorf("targetConn -> conn 读取错误: %v", err)
-				return // 其他读取错误，退出循环
-			}
-
-			// 将读取到的数据写入 conn
-			_, err = conn.Write(buffer[:n])
-			if err != nil {
-				logrus.Errorf("targetConn -> conn 写入错误: %v", err)
-				return // 写入错误，退出循环
-			}
-			downloadCounter.Add(float64(n)) // 手动增加计数器
+		n, err := io.Copy(conn, targetConn)
+		if err != nil {
+			//logrus.Errorf("targetConn -> conn 读取错误: %v", err)
+			return
 		}
+		downloadCounter.Add(float64(n)) // 手动增加计数器
+
 	}()
 
-	wg.Wait()
+	<-ctx.Done()
 }
