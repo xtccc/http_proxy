@@ -316,5 +316,7 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.openinstall.com"
     forwardMethod: "direct"
+  - domainPattern: "*.npmmirror.com"
+    forwardMethod: "direct"
   
 
