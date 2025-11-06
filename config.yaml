@@ -318,5 +318,5 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.npmmirror.com"
     forwardMethod: "direct"
-  
-
+  - domainPattern: "connectivity-check.ubuntu.com"
+    forwardMethod: "direct"
