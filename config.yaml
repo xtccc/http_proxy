@@ -320,3 +320,5 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "connectivity-check.ubuntu.com"
     forwardMethod: "direct"
+  - domainPattern: "isjike.com"
+    forwardMethod: "direct"
