@@ -346,3 +346,7 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.joying.com"
     forwardMethod: "direct"
+  - domainPattern: "*.myhuaweicloud.com"
+    forwardMethod: "direct"
+  - domainPattern: "*.visualstudio.com"
+    forwardMethod: "direct"
