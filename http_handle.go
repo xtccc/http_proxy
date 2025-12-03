@@ -85,23 +85,34 @@ func handleConnection_http(clientConn net.Conn, req *http.Request) {
 	}
 
 	// 读取目标服务器的响应
-	resp, err := http.ReadResponse(bufio.NewReader(targetConn), req)
-	if err != nil {
-		log.Printf("Failed to read response: %v", err)
-		return
-	}
-	defer resp.Body.Close()
+	// HTTP 响应，在 Expect: 100-continue 机制下，可以返回多条。
+	reader := bufio.NewReader(targetConn)
+	for {
+		resp, err := http.ReadResponse(reader, req)
+		if err != nil {
+			log.Printf("Failed to read response: %v", err)
+			return
+		}
 
-	// 将响应写入到缓冲区以计算大小
-	respBytes, err := httputil.DumpResponse(resp, true)
-	if err != nil {
-		log.Printf("Failed to dump response: %v", err)
-		return
-	}
-	_, err = clientConn.Write(respBytes)
-	if err != nil {
-		log.Printf("Failed to send response to client: %v", err)
-		return
+		// dump and forward
+		respBytes, err := httputil.DumpResponse(resp, true)
+		if err != nil {
+			log.Printf("Failed to dump response: %v", err)
+			return
+		}
+
+		_, err = clientConn.Write(respBytes)
+		if err != nil {
+			log.Printf("Failed to send response: %v", err)
+			return
+		}
+
+		// 收到最终响应（非 1xx），跳出循环
+		if resp.StatusCode < 100 || resp.StatusCode >= 200 {
+			break
+		}
+
+		// 如果是 1xx，例如 100 Continue，则继续读下一条
 	}
 
 }
