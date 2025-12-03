@@ -350,3 +350,5 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.visualstudio.com"
     forwardMethod: "direct"
+  - domainPattern: "*.xiaomimobile.com"
+    forwardMethod: "direct"
