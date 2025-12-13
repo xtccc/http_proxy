@@ -356,3 +356,5 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.pddpic.com"
     forwardMethod: "direct"
+  - domainPattern: "*.cpatrk.net"
+    forwardMethod: "direct"
