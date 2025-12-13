@@ -352,3 +352,7 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.xiaomimobile.com"
     forwardMethod: "direct"
+  - domainPattern: "*.wavpub.com"
+    forwardMethod: "direct"
+  - domainPattern: "*.pddpic.com"
+    forwardMethod: "direct"
