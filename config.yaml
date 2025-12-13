@@ -358,3 +358,5 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.cpatrk.net"
     forwardMethod: "direct"
+  - domainPattern: "*.clickwifi.net"
+    forwardMethod: "direct"
