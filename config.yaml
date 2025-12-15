@@ -360,3 +360,5 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.clickwifi.net"
     forwardMethod: "direct"
+  - domainPattern: "*.fancyapi.com"
+    forwardMethod: "direct"
