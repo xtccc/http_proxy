@@ -372,3 +372,7 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.xiawan8.com"
     forwardMethod: "direct"
+  - domainPattern: "*.openai.com"
+    forwardMethod: "direct"
+  - domainPattern: "*.leiphone.com"
+    forwardMethod: "direct"
