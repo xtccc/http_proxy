@@ -362,3 +362,7 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.fancyapi.com"
     forwardMethod: "direct"
+  - domainPattern: "*.chatgpt.com"
+    forwardMethod: "direct"
+  - domainPattern: "*.rtbasia.com"
+    forwardMethod: "direct"
