@@ -364,3 +364,5 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.leiphone.com"
     forwardMethod: "direct"
+  - domainPattern: "*.douyu.com"
+    forwardMethod: "direct"
