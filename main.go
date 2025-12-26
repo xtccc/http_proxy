@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"strings"
@@ -105,7 +104,7 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 func handleConnectRequest(conn net.Conn) {
 	reqLine, body, err := readRequestHeaderAndBody(conn)
 	if err != nil {
-		log.Printf("Failed to read request: %v", err)
+		logrus.Errorf("Failed to read request: %v", err)
 		return
 	}
 
@@ -139,7 +138,7 @@ func handleConnectRequest(conn net.Conn) {
 		}
 		req, err := createHTTPRequest(reqLine, body)
 		if err != nil {
-			log.Printf("Failed to create HTTP request: %v", err)
+			logrus.Errorf("Failed to create HTTP request: %v", err)
 			return
 		}
 		handleConnectRequest_http(conn, req)
