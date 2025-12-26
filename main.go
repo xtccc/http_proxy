@@ -107,7 +107,7 @@ func handleConnectRequest(conn net.Conn) {
 		logrus.Errorf("Failed to read request: %v", err)
 		return
 	}
-
+	logrus.Debugf("reqLine :\n %s\n", reqLine)
 	// 解析出目标主机和端口
 	// 格式为 CONNECT www.google.com:443 HTTP/1.1
 	parts := strings.Split(reqLine, " ")
@@ -122,6 +122,7 @@ func handleConnectRequest(conn net.Conn) {
 	logrus.Debug("reqLine:", reqLine)
 	switch method {
 	case "CONNECT":
+		logrus.Debug("处理CONNECT请求，转发给HTTPS上游")
 		handleConnectRequest_https(conn, target, reqLine)
 		//除了CONNECT其余的都是http的协议，转给http的上游
 
@@ -131,11 +132,12 @@ func handleConnectRequest(conn net.Conn) {
 		if isHTTPS(reqLine) {
 			// 使用 CONNECT 方法来处理隧道建立
 			method = "CONNECT" // 强制转换为 CONNECT
-
+			logrus.Debug("处理HTTPS请求，转发给HTTPS上游")
 			// 然后调用 https 请求的处理函数
 			handleConnectRequest_https(conn, target, reqLine)
 			return
 		}
+		logrus.Debug("处理HTTP请求，转发给HTTP上游")
 		req, err := createHTTPRequest(reqLine, body)
 		if err != nil {
 			logrus.Errorf("Failed to create HTTP request: %v", err)
