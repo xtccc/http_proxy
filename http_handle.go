@@ -5,11 +5,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 func createHTTPRequest(reqline string, body []byte) (*http.Request, error) {
@@ -67,7 +68,7 @@ func handleConnection_http(clientConn net.Conn, req *http.Request) {
 	}
 	targetConn, err := net.Dial("tcp", addr)
 	if err != nil {
-		log.Printf("Failed to connect to target: %v", err)
+		logrus.Errorf("Failed to connect to target: %v", err)
 		return
 	}
 	defer targetConn.Close()
@@ -75,12 +76,12 @@ func handleConnection_http(clientConn net.Conn, req *http.Request) {
 	// 将客户端的请求转发到目标服务器
 	reqBytes, err := httputil.DumpRequest(req, true)
 	if err != nil {
-		log.Printf("Failed to dump request: %v", err)
+		logrus.Errorf("Failed to dump request: %v", err)
 		return
 	}
 	_, err = targetConn.Write(reqBytes)
 	if err != nil {
-		log.Printf("Failed to forward request: %v", err)
+		logrus.Errorf("Failed to forward request: %v", err)
 		return
 	}
 
@@ -90,20 +91,20 @@ func handleConnection_http(clientConn net.Conn, req *http.Request) {
 	for {
 		resp, err := http.ReadResponse(reader, req)
 		if err != nil {
-			log.Printf("Failed to read response: %v", err)
+			logrus.Errorf("Failed to read response: %v", err)
 			return
 		}
 
 		// dump and forward
 		respBytes, err := httputil.DumpResponse(resp, true)
 		if err != nil {
-			log.Printf("Failed to dump response: %v", err)
+			logrus.Errorf("Failed to dump response: %v", err)
 			return
 		}
 
 		_, err = clientConn.Write(respBytes)
 		if err != nil {
-			log.Printf("Failed to send response: %v", err)
+			logrus.Errorf("Failed to send response: %v", err)
 			return
 		}
 
@@ -123,7 +124,7 @@ func handleConnection_http_proxy(clientConn net.Conn, req *http.Request, upstrea
 
 	upstreamConn, err := net.Dial("tcp", upstream)
 	if err != nil {
-		log.Printf("Failed to connect to upstream proxy: %v", err)
+		logrus.Errorf("Failed to connect to upstream proxy: %v", err)
 		return
 	}
 	defer upstreamConn.Close()
@@ -134,19 +135,19 @@ func handleConnection_http_proxy(clientConn net.Conn, req *http.Request, upstrea
 	// 将请求转发到上游代理
 	reqBytes, err := httputil.DumpRequest(req, true)
 	if err != nil {
-		log.Printf("Failed to dump request: %v", err)
+		logrus.Errorf("Failed to dump request: %v", err)
 		return
 	}
 	_, err = upstreamConn.Write(reqBytes)
 	if err != nil {
-		log.Printf("Failed to forward request to upstream: %v", err)
+		logrus.Errorf("Failed to forward request to upstream: %v", err)
 		return
 	}
 
 	// 读取上游代理的响应
 	resp, err := http.ReadResponse(bufio.NewReader(upstreamConn), req)
 	if err != nil {
-		log.Printf("Failed to read response from upstream: %v", err)
+		logrus.Errorf("Failed to read response from upstream: %v", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -154,12 +155,12 @@ func handleConnection_http_proxy(clientConn net.Conn, req *http.Request, upstrea
 	// 将响应写入到缓冲区以计算大小
 	respBytes, err := httputil.DumpResponse(resp, true)
 	if err != nil {
-		log.Printf("Failed to dump response: %v", err)
+		logrus.Errorf("Failed to dump response: %v", err)
 		return
 	}
 	_, err = clientConn.Write(respBytes)
 	if err != nil {
-		log.Printf("Failed to send response to client: %v", err)
+		logrus.Errorf("Failed to send response to client: %v", err)
 		return
 	}
 
