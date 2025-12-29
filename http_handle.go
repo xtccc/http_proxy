@@ -36,15 +36,16 @@ func handleConnectRequest_http(conn net.Conn, req *http.Request) {
 	} else {
 		host = req.Host
 	}
+	log := logrus.WithField("reqID", req.Context().Value(requestIDKey))
+	upstream, ForwardMethod := getForwardMethodForHost(log, proxy_upstream, host, req.URL.Port(), "http")
 
-	upstream, ForwardMethod := getForwardMethodForHost(proxy_upstream, host, req.URL.Port(), "http")
-
-	if ForwardMethod == "proxy" {
+	switch ForwardMethod {
+	case "proxy":
 		handleConnection_http_proxy(conn, req, upstream)
-	} else if ForwardMethod == "direct" {
+	case "direct":
 		handleConnection_http(conn, req)
 
-	} else if ForwardMethod == "block" {
+	case "block":
 		conn.Close()
 		//让客户端连接直接关闭
 		return
@@ -54,6 +55,8 @@ func handleConnectRequest_http(conn net.Conn, req *http.Request) {
 // 修改 handleConnection_http 函数
 func handleConnection_http(clientConn net.Conn, req *http.Request) {
 	defer clientConn.Close()
+	log := logrus.WithField("reqID", req.Context().Value(requestIDKey))
+
 	var addr string
 	if !strings.Contains(req.URL.Host, ":") {
 		addr = req.URL.Host + ":" + "80"
@@ -68,7 +71,7 @@ func handleConnection_http(clientConn net.Conn, req *http.Request) {
 	}
 	targetConn, err := net.Dial("tcp", addr)
 	if err != nil {
-		logrus.Errorf("Failed to connect to target: %v", err)
+		log.Errorf("Failed to connect to target: %v", err)
 		return
 	}
 	defer targetConn.Close()
@@ -76,12 +79,12 @@ func handleConnection_http(clientConn net.Conn, req *http.Request) {
 	// 将客户端的请求转发到目标服务器
 	reqBytes, err := httputil.DumpRequest(req, true)
 	if err != nil {
-		logrus.Errorf("Failed to dump request: %v", err)
+		log.Errorf("Failed to dump request: %v", err)
 		return
 	}
 	_, err = targetConn.Write(reqBytes)
 	if err != nil {
-		logrus.Errorf("Failed to forward request: %v", err)
+		log.Errorf("Failed to forward request: %v", err)
 		return
 	}
 
@@ -91,20 +94,20 @@ func handleConnection_http(clientConn net.Conn, req *http.Request) {
 	for {
 		resp, err := http.ReadResponse(reader, req)
 		if err != nil {
-			logrus.Errorf("Failed to read response: %v", err)
+			log.Errorf("Failed to read response: %v", err)
 			return
 		}
 
 		// dump and forward
 		respBytes, err := httputil.DumpResponse(resp, true)
 		if err != nil {
-			logrus.Errorf("Failed to dump response: %v", err)
+			log.Errorf("Failed to dump response: %v", err)
 			return
 		}
 
 		_, err = clientConn.Write(respBytes)
 		if err != nil {
-			logrus.Errorf("Failed to send response: %v", err)
+			log.Errorf("Failed to send response: %v", err)
 			return
 		}
 
@@ -121,10 +124,11 @@ func handleConnection_http(clientConn net.Conn, req *http.Request) {
 // 修改 handleConnection_http_proxy 函数
 func handleConnection_http_proxy(clientConn net.Conn, req *http.Request, upstream string) {
 	defer clientConn.Close()
+	log := logrus.WithField("reqID", req.Context().Value(requestIDKey))
 
 	upstreamConn, err := net.Dial("tcp", upstream)
 	if err != nil {
-		logrus.Errorf("Failed to connect to upstream proxy: %v", err)
+		log.Errorf("Failed to connect to upstream proxy: %v", err)
 		return
 	}
 	defer upstreamConn.Close()
@@ -135,19 +139,19 @@ func handleConnection_http_proxy(clientConn net.Conn, req *http.Request, upstrea
 	// 将请求转发到上游代理
 	reqBytes, err := httputil.DumpRequest(req, true)
 	if err != nil {
-		logrus.Errorf("Failed to dump request: %v", err)
+		log.Errorf("Failed to dump request: %v", err)
 		return
 	}
 	_, err = upstreamConn.Write(reqBytes)
 	if err != nil {
-		logrus.Errorf("Failed to forward request to upstream: %v", err)
+		log.Errorf("Failed to forward request to upstream: %v", err)
 		return
 	}
 
 	// 读取上游代理的响应
 	resp, err := http.ReadResponse(bufio.NewReader(upstreamConn), req)
 	if err != nil {
-		logrus.Errorf("Failed to read response from upstream: %v", err)
+		log.Errorf("Failed to read response from upstream: %v", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -155,12 +159,12 @@ func handleConnection_http_proxy(clientConn net.Conn, req *http.Request, upstrea
 	// 将响应写入到缓冲区以计算大小
 	respBytes, err := httputil.DumpResponse(resp, true)
 	if err != nil {
-		logrus.Errorf("Failed to dump response: %v", err)
+		log.Errorf("Failed to dump response: %v", err)
 		return
 	}
 	_, err = clientConn.Write(respBytes)
 	if err != nil {
-		logrus.Errorf("Failed to send response to client: %v", err)
+		log.Errorf("Failed to send response to client: %v", err)
 		return
 	}
 

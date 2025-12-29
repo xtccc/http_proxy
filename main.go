@@ -2,14 +2,20 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"net"
 	"os"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
+
+type contextKey string
+
+const requestIDKey contextKey = "requestID"
 
 // 判断一个IP地址是否在指定的范围内
 func isInRange(ipStr, startStr, endStr string) bool {
@@ -27,14 +33,14 @@ func isInRange(ipStr, startStr, endStr string) bool {
 }
 
 // 检查域名是否符合后缀匹配规则
-func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstreamHost, method string) {
+func getForwardMethodForHost(log *logrus.Entry, proxy_upstream, host, port, protocol string) (upstreamHost, method string) {
 	direct_upstream := host + ":" + port
 	// 遍历映射规则
 	for _, rule := range domainForwardMap.Rules {
 		//全局直连 用于纯粹的转发http流量
 		if rule.DomainPattern == "*" && rule.ForwardMethod == "direct" {
 			upstreamHost = direct_upstream
-			logrus.Infof("全局直连规则: protocol: %s host: %s method: %s upstream: %s", protocol, host, rule.ForwardMethod, upstreamHost)
+			log.Infof("全局直连规则: protocol: %s host: %s method: %s upstream: %s", protocol, host, rule.ForwardMethod, upstreamHost)
 			method = rule.ForwardMethod
 			return
 		}
@@ -46,17 +52,18 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 			// 检查域名后缀是否匹配,和*.domain相同的也能匹配上
 			if strings.HasSuffix(host, domainSuffix) {
 
-				if rule.ForwardMethod == "direct" {
+				switch rule.ForwardMethod {
+				case "direct":
 					upstreamHost = direct_upstream
-				} else if rule.ForwardMethod == "block" {
+				case "block":
 					upstreamHost = ""
 					method = rule.ForwardMethod
-					logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, rule.ForwardMethod, upstreamHost)
+					log.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, rule.ForwardMethod, upstreamHost)
 					return
-				} else {
+				default:
 					upstreamHost = proxy_upstream
 				}
-				logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, rule.ForwardMethod, upstreamHost)
+				log.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, rule.ForwardMethod, upstreamHost)
 				return upstreamHost, rule.ForwardMethod
 			}
 		} else if host == rule.DomainPattern {
@@ -66,7 +73,7 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 				upstreamHost = proxy_upstream
 			}
 			// 精确匹配域名
-			logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, rule.ForwardMethod, upstreamHost)
+			log.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, rule.ForwardMethod, upstreamHost)
 
 			return upstreamHost, rule.ForwardMethod
 		}
@@ -76,7 +83,7 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 		// 172.16.0.0 - 172.31.255.255 直连
 		// 如果 host 是以 192.168. 或 10. 开头的内网 IP，使用直连规则
 		upstreamHost = direct_upstream
-		logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, "direct", upstreamHost)
+		log.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, "direct", upstreamHost)
 		return upstreamHost, "direct"
 	}
 
@@ -87,43 +94,44 @@ func getForwardMethodForHost(proxy_upstream, host, port, protocol string) (upstr
 		if host == "1.1.1.1" || host == "8.8.8.8" {
 			upstreamHost = proxy_upstream
 			method = "proxy"
-			logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, method, upstreamHost)
+			log.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, method, upstreamHost)
 			return
 		} else {
 			upstreamHost = direct_upstream
 			method = "direct"
-			logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, method, upstreamHost)
+			log.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, method, upstreamHost)
 			return
 		}
 	}
 
 	// 默认使用代理
-	logrus.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, "proxy", proxy_upstream)
+	log.Infof("protocol: %s host: %s method: %s upstream: %s", protocol, host, "proxy", proxy_upstream)
 	return proxy_upstream, "proxy"
 }
-func handleConnectRequest(conn net.Conn) {
+func handleConnectRequest(ctx context.Context, conn net.Conn) {
+	log := logrus.WithField("reqID", ctx.Value(requestIDKey))
 	reqLine, body, err := readRequestHeaderAndBody(conn)
 	if err != nil {
-		logrus.Errorf("Failed to read request: %v", err)
+		log.Errorf("Failed to read request: %v", err)
 		return
 	}
-	logrus.Debugf("reqLine :\n %s\n", reqLine)
+	log.Debugf("reqLine :\n %s\n", reqLine)
 	// 解析出目标主机和端口
 	// 格式为 CONNECT www.google.com:443 HTTP/1.1
 	parts := strings.Split(reqLine, " ")
 	if len(parts) < 3 {
-		logrus.Errorf("Invalid CONNECT request format,reqLine: %s", reqLine)
+		log.Errorf("Invalid CONNECT request format,reqLine: %s", reqLine)
 		return
 	}
 
 	method := parts[0]
 	target := parts[1]
 	// 根据请求方法处理
-	logrus.Debug("reqLine:", reqLine)
+	log.Debug("reqLine:", reqLine)
 	switch method {
 	case "CONNECT":
-		logrus.Debug("处理CONNECT请求，转发给HTTPS上游")
-		handleConnectRequest_https(conn, target, reqLine)
+		log.Debug("处理CONNECT请求，转发给HTTPS上游")
+		handleConnectRequest_https(ctx, conn, target, reqLine)
 		//除了CONNECT其余的都是http的协议，转给http的上游
 
 	default:
@@ -132,17 +140,19 @@ func handleConnectRequest(conn net.Conn) {
 		if isHTTPS(reqLine) {
 			// 使用 CONNECT 方法来处理隧道建立
 			method = "CONNECT" // 强制转换为 CONNECT
-			logrus.Debug("处理HTTPS请求，转发给HTTPS上游")
+			log.Debug("处理HTTPS请求，转发给HTTPS上游")
 			// 然后调用 https 请求的处理函数
-			handleConnectRequest_https(conn, target, reqLine)
+			handleConnectRequest_https(ctx, conn, target, reqLine)
 			return
 		}
-		logrus.Debug("处理HTTP请求，转发给HTTP上游")
+		log.Debug("处理HTTP请求，转发给HTTP上游")
 		req, err := createHTTPRequest(reqLine, body)
 		if err != nil {
-			logrus.Errorf("Failed to create HTTP request: %v", err)
+			log.Errorf("Failed to create HTTP request: %v", err)
 			return
 		}
+		// 注入context
+		req = req.WithContext(ctx)
 		handleConnectRequest_http(conn, req)
 	}
 }
@@ -239,7 +249,11 @@ func main() {
 		}
 
 		// 处理 请求
-		go handleConnectRequest(conn)
+		go func(c net.Conn) {
+			reqID := uuid.New().String()
+			ctx := context.WithValue(context.Background(), requestIDKey, reqID)
+			handleConnectRequest(ctx, c)
+		}(conn)
 	}
 }
 
