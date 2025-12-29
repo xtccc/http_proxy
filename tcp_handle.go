@@ -62,12 +62,22 @@ func readRequestHeaderAndBody(conn net.Conn) (string, []byte, error) {
 func handleConnectRequest_https(conn net.Conn, target, reqLine string) {
 	hostPort := strings.Split(target, ":")
 	if len(hostPort) != 2 {
-		logrus.Errorf("Invalid target format ,target: %s", target)
-		return
+		// ipv6 地址可能包含多个冒号，需要特殊处理 // [2408:8706:0:680b::35]:443
+		if strings.Contains(target, "[") && strings.Contains(target, "]") {
+			endIndex := strings.Index(target, "]:")
+			host := target[1:endIndex]
+			port := target[endIndex+2:]
+			hostPort = []string{"[" + host + "]", port}
+		} else {
+			logrus.Errorf("Invalid target format ,target: %s", target)
+			return
+		}
+
 	}
 
 	host := hostPort[0]
 	port := hostPort[1]
+	logrus.Debug("handleConnectRequest_https target:", target, " host:", host, " port:", port)
 	proxy_upstream := *proxyAddr
 	upstream, ForwardMethod := getForwardMethodForHost(proxy_upstream, host, port, "https")
 
