@@ -370,3 +370,5 @@ rules:
     forwardMethod: "direct"
   - domainPattern: "*.douyu.com"
     forwardMethod: "direct"
+  - domainPattern: "169.254.169.254"
+    forwardMethod: "block"
