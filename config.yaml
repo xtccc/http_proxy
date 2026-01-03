@@ -375,3 +375,5 @@ rules:
 
   - domainPattern: "*.aispeech.com"
     forwardMethod: "direct"
+  - domainPattern: "*.tongyi.com"
+    forwardMethod: "direct"
